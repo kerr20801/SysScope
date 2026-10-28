@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- 資安防護：強制禁止任何硬碟快取與資料殘留 (Zero-Disk-Retention) -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>SysScope — 系統主機全方位異常透視儀</title>
+<style>
+:root {
+  --primary: #0284c7;
+  --bg: #0b0f19;
+  --card-bg: #121829;
+  --border: #1e293b;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang TC","Microsoft JhengHei",sans-serif;font-size:13px;min-height:100vh}
+
+/* Header */
+.header{background:#0d1322;border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.header-left{display:flex;align-items:center;gap:12px}
+.logo{width:38px;height:38px;border-radius:9px;background:#091220;border:1.5px solid #0369a1;display:flex;align-items:center;justify-content:center;font-size:20px;color:#38bdf8}
+.header-text h1{font-size:16px;font-weight:700;color:var(--text-main);display:flex;align-items:center;gap:8px}
+.header-text p{font-size:11.5px;color:var(--text-dim);margin-top:2px}
+.header-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pill{background:#111827;border:1px solid var(--border);border-radius:20px;padding:4px 12px;font-size:11px;color:var(--text-muted)}
+.pill strong{color:#38bdf8}
+
+/* Tabs */
+.tabs-nav{background:#0e1424;border-bottom:1px solid var(--border);display:flex;padding:0 24px;gap:6px;overflow-x:auto}
+.tab-btn{background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:12px 16px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .2s;white-space:nowrap}
+.tab-btn:hover{color:#fff}
+.tab-btn.active{color:#38bdf8;border-bottom-color:#38bdf8}
+
+/* Main Container */
+.main{max-width:1260px;margin:0 auto;padding:20px}
+
+/* Cards */
+.card{background:var(--card-bg);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:16px}
+.card-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px}
+.card-hdr h2{font-size:14.5px;font-weight:700;color:var(--text-main);display:flex;align-items:center;gap:8px}
+.card-hdr p{font-size:12px;color:var(--text-muted);margin-top:2px}
+
+/* Forms & Textarea */
+textarea{width:100%;height:170px;background:#070b14;border:1px solid var(--border);border-radius:6px;color:#86efac;font-family:"Fira Code","Consolas",monospace;font-size:11.5px;padding:10px;resize:vertical;outline:none;line-height:1.55}
+textarea:focus{border-color:#0284c7}
+.sinput{background:#070b14;border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:#e0e0e0;font-size:12px;outline:none}
+
+/* Buttons */
+.btn-row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center}
+.btn{padding:8px 16px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:700;font-family:inherit;transition:opacity .15s, background .2s;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{opacity:.88}
+.btn-primary{background:#0284c7;color:#fff}
+.btn-secondary{background:#1e293b;color:#cbd5e1;border:1px solid #334155}
+.btn-secondary:hover{border-color:#38bdf8;color:#fff}
+.btn-danger{background:#dc2626;color:#fff}
+.btn-sm{padding:4px 10px;font-size:11px}
+
+/* Verdict Card */
+.verdict-card{border-left:6px solid #10b981;background:#0c1524;padding:16px 20px;border-radius:8px;margin-bottom:16px}
+.verdict-title{font-size:16px;font-weight:800;color:#f8fafc;margin-bottom:6px}
+.verdict-party{display:inline-block;padding:3px 10px;border-radius:4px;font-size:12px;font-weight:700;margin-bottom:8px}
+.verdict-reason{font-size:13px;line-height:1.6;color:#e2e8f0;background:rgba(0,0,0,0.3);padding:10px 14px;border-radius:6px;margin-bottom:10px}
+.verdict-action{font-size:12.5px;color:#fbbf24;font-weight:600;white-space:pre-wrap;line-height:1.5}
+
+/* Code Snippet Box */
+.code-box{background:#060911;border:1px solid #1e293b;border-radius:6px;padding:8px 12px;font-family:"Fira Code",Consolas,monospace;font-size:12px;color:#38bdf8;word-break:break-all;margin-top:6px;white-space:pre-wrap}
+
+/* Badges */
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700}
+.badge-crit{background:#7f1d1d;color:#fca5a5;border:1px solid #ef4444}
+.badge-warn{background:#78350f;color:#fcd34d;border:1px solid #f59e0b}
+.badge-info{background:#0c4a6e;color:#7dd3fc;border:1px solid #0284c7}
+.badge-ok{background:#064e3b;color:#6ee7b7;border:1px solid #10b981}
+
+/* Filter pills */
+.filter-bar{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center}
+.filter-chip{background:#0b1324;border:1px solid #1e293b;border-radius:20px;padding:4px 12px;font-size:11.5px;color:#94a3b8;cursor:pointer;transition:all .15s}
+.filter-chip:hover{border-color:#38bdf8;color:#fff}
+.filter-chip.active{background:#0284c7;color:#fff;border-color:#0284c7;font-weight:700}
+
+/* Toast */
+.toast-msg{position:fixed;bottom:30px;right:30px;background:#0f172a;border:1.5px solid #10b981;color:#f8fafc;padding:12px 20px;border-radius:8px;box-shadow:0 10px 25px rgba(0,0,0,0.5);font-size:13px;font-weight:700;z-index:99999}
+
+/* Tables */
+table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12px}
+th{background:#090e1a;color:#94a3b8;text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,0.05);vertical-align:middle}
+tr:hover{background:rgba(255,255,255,0.02)}
+
+/* Panorama Grid & Chain Cards */
+.matrix-grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(185px, 1fr));gap:12px;margin-top:10px}
+.matrix-card{background:#0a0f1d;border:1px solid #1e293b;border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;justify-content:space-between;transition:transform .15s, border-color .15s}
+.matrix-card:hover{transform:translateY(-2px);border-color:#38bdf8}
+.chain-box{background:#0a0f1e;border-left:4px solid #f59e0b;padding:12px 14px;border-radius:6px;margin-bottom:10px}
+.chain-flow{background:#040711;padding:8px 12px;border-radius:6px;font-family:"Fira Code",Consolas,monospace;font-size:12px;color:#38bdf8;margin:6px 0;line-height:1.6}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-left">
+    <div class="logo">🩺</div>
+    <div class="header-text">
+      <h1>SysScope <span style="font-size:11px;font-weight:normal;color:#38bdf8;background:rgba(56,189,248,0.12);padding:2px 8px;border-radius:9999px;">Host Doctor v1.1</span></h1>
+      <p>系統主機全方位異常透視儀 ｜ 0 外部依賴 ｜ 純 RAM 揮發型運算</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="pill">聯合打造：<strong>Kerr & Google Gemini</strong></div>
+    <div class="pill">核心理念：<strong>人機協同 · 深維透視</strong></div>
+    <div class="pill" id="sysHostBadge">主機：<strong>載入中...</strong></div>
+  </div>
+</header>
+
+<!-- Tabs Navigation -->
+<div class="tabs-nav">
+  <button class="tab-btn active" id="tabBtnPanorama" onclick="switchTab('panorama')">🧭 全景大會診 (All-in-One Panorama)</button>
+  <button class="tab-btn" id="tabBtnHistory" onclick="switchTab('history')">🕵️ 指令歷史鑑識 (History Forensic)</button>
+  <button class="tab-btn" id="tabBtnDisk" onclick="switchTab('disk')">💽 磁碟幽靈空間急救 (Ghost Disk)</button>
+  <button class="tab-btn" id="tabBtnSystemd" onclick="switchTab('systemd')">🚨 服務崩潰捕手 (Systemd CrashLoop)</button>
+  <button class="tab-btn" id="tabBtnOOM" onclick="switchTab('oom')">🔪 OOM 殺人案發現場 (OOM Forensic)</button>
+  <button class="tab-btn" id="tabBtnReboot" onclick="switchTab('reboot')">💣 重開機安全驗收 (Reboot Readiness)</button>
+</div>
+
+<main class="main">
+
+  <!-- ==================== TAB 0: 全主機一體化全景急診 (Cisco Tech-Support 風格) ==================== -->
+  <div id="viewPanorama">
+    <div class="card" style="border-left:4px solid #38bdf8;background:#0d1525;padding:16px 20px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px;">
+        <div style="font-size:13px;color:#cbd5e1;line-height:1.65;flex:1;min-width:320px;">
+          <strong style="color:#38bdf8;font-size:15px;">🧭 Cisco「show tech-support」模式：一次採集，全維度因果推演！</strong><br>
+          不用跨頁面碎片化翻找！現場只要在 Linux 終端機貼上一行打包指令，即可將 <strong>History、Systemd、Disk、OOM、Reboot、Network</strong> 6 大命脈一次輸出，SysScope 自動重構跨上下文事故因果鏈！<br>
+          👉 <strong>Linux 現場一鍵打包指令（點擊複製後貼入 Linux 終端機）：</strong><br>
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+            <button class="btn btn-sm btn-secondary" style="background:#0369a1;color:#fff;border-color:#38bdf8;" data-cmd='(echo "=== [1] HISTORY ==="; HISTTIMEFORMAT="%F %T " history 300 2>/dev/null || cat ~/.bash_history 2>/dev/null | tail -n 300; echo "=== [2] SYSTEMD ==="; systemctl --failed --no-pager 2>/dev/null; journalctl -p 3 -xb -n 30 --no-pager 2>/dev/null; echo "=== [3] DISK ==="; df -h; echo "---"; df -i; lsof +L1 2>/dev/null | grep deleted | head -n 30; echo "=== [4] MEM_OOM ==="; free -m; dmesg -T 2>/dev/null | grep -Ei "oom|killed process|out of memory" | tail -n 30; echo "=== [5] REBOOT ==="; cat /etc/fstab 2>/dev/null; cat /proc/mounts 2>/dev/null; echo "=== [6] NETWORK ==="; ss -tulpn 2>/dev/null)' onclick="copySnippet(this.dataset.cmd)">
+              📋 一鍵複製 Linux 全景採集指令 (Cisco Tech-Support)
+            </button>
+            <button class="btn btn-sm btn-secondary" onclick="autoScanHost()">⚡ 本機現場直接掃描 (若運行於生產主機)</button>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button class="btn btn-primary" style="padding:10px 16px;background:#0284c7;font-size:13px;" onclick="loadSample('bundle')">
+            📋 填入全景事故大範例 (Cisco Tech-Support 風格)
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <div>
+          <h2>🧭 全景資訊貼入區 (All-in-One Tech-Support Bundle)</h2>
+          <p>支援貼入包含 <code>=== [1] HISTORY ===</code>、<code>=== [2] SYSTEMD ===</code> 等區塊之綜合文字，或自由貼入多維度日誌（自動智慧辨識）。</p>
+        </div>
+      </div>
+      <textarea id="bundleInput" spellcheck="false" style="height:210px;" placeholder="貼入 Linux 採集指令輸出內容：
+=== [1] HISTORY ===
+  101  2026-10-28 11:20:00  df -h
+  102  2026-10-28 11:25:00  rm -rf /var/log/catalina.out
+  103  2026-10-28 11:40:00  swapoff -a
+  104  2026-10-28 11:50:00  systemctl restart nginx
+
+=== [2] SYSTEMD ===
+● nginx.service - A high performance web server
+   Loaded: loaded (/lib/systemd/system/nginx.service; enabled)
+   Active: failed (Result: exit-code)
+Oct 28 11:50:01 srv01 nginx[12891]: nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
+
+=== [3] DISK ===
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda1        50G   50G     0 100% /
+---
+COMMAND   PID USER   FD   TYPE DEVICE   SIZE/OFF   NODE NAME
+java     1821 root    4w   REG    8,1 4829182910 128912 /var/log/catalina.out (deleted)
+
+=== [4] MEM_OOM ===
+              total        used        free      shared  buff/cache   available
+Mem:          15820       15320         100         310         400         200
+Swap:             0           0           0
+---
+Out of memory: Kill process 18291 (mysqld) score 851 or sacrifice child
+Killed process 18291 (mysqld) anon-rss:382910kB
+
+=== [5] REBOOT ===
+UUID=a1b2c3d4-0001 / ext4 defaults 0 1
+192.168.1.100:/shared/nfs /mnt/nfs nfs defaults 0 0
+
+=== [6] NETWORK ===
+Netid State  Recv-Q Send-Q Local Address:Port Peer Address:Port Process
+tcp   LISTEN 0      128    0.0.0.0:80         0.0.0.0:*         users:(("apache2",pid=884,fd=4))
+"></textarea>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="analyzeBundle()">⚡ 開始全主機一體化全景急診 (Cross-Context Synthesis)</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('bundleInput').value=''">🗑️ 清空</button>
+      </div>
+    </div>
+
+    <!-- Master Results -->
+    <div id="panoramaResults" style="display:none;"></div>
+  </div>
+
+  <!-- ==================== TAB 1: 指令歷史鑑識 ==================== -->
+  <div id="viewHistory" style="display:none;">
+    <div class="card" style="border-left:4px solid #38bdf8;background:#0d1525;padding:16px 20px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px;">
+        <div style="font-size:13px;color:#cbd5e1;line-height:1.65;flex:1;min-width:320px;">
+          <strong style="color:#38bdf8;font-size:14.5px;">💡 這是什麼功能？該給什麼訊息？</strong><br>
+          85% 的伺服器死機，都是事故前半小時有人敲了某個指令造成的！<br>
+          👉 <strong>取得歷史指令建議（點擊一鍵複製，貼到 Linux 終端機執行後將文字貼入下方）：</strong><br>
+          <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
+            <button class="btn btn-sm btn-secondary" data-cmd="HISTTIMEFORMAT='%F %T ' history 300" onclick="copySnippet(this.dataset.cmd)">📋 複製：帶時間戳記 300 筆 (推薦)</button>
+            <button class="btn btn-sm btn-secondary" data-cmd="cat ~/.bash_history | tail -n 500" onclick="copySnippet(this.dataset.cmd)">📋 複製：通用 ~/.bash_history 500 筆</button>
+            <button class="btn btn-sm btn-secondary" data-cmd="history | tail -n 500" onclick="copySnippet(this.dataset.cmd)">📋 複製：標準 history 500 筆</button>
+          </div>
+        </div>
+        <div>
+          <button class="btn btn-primary" onclick="loadSample('history')">📋 點我填入事故歷史範例 (含改設定/重啟/清防火牆/密碼外洩)</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <div>
+          <h2>🕵️ 終端機指令歷史 (History) 輸入區</h2>
+          <p>支援 50~1000 筆指令輸入，自動剖析「設定變更、服務重啟、網路防火牆、套件異動、密碼外洩」，並串聯事故導火線！</p>
+        </div>
+      </div>
+      <textarea id="historyInput" spellcheck="false" placeholder="貼入終端機 history 輸出（建議 100~500 筆）：
+ 1001  2026-10-28 11:30:10  free -m
+ 1002  2026-10-28 11:31:02  df -h
+ 1003  2026-10-28 11:35:20  pip install -r requirements.txt
+ 1004  2026-10-28 11:40:05  vim /etc/nginx/sites-available/default
+ 1005  2026-10-28 11:41:20  systemctl reload nginx
+ 1006  2026-10-28 11:49:00  chmod -R 777 ~/.ssh
+ 1007  2026-10-28 11:51:25  sudo iptables -F
+ 1008  2026-10-28 11:53:40  swapoff -a"></textarea>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="analyzeHistory()">⚡ 開始全維度歷史鑑識與導火線剖析</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('historyInput').value=''">🗑️ 清空</button>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div id="historyResults" style="display:none;"></div>
+  </div>
+
+  <!-- ==================== TAB 2: 磁碟幽靈空間急救 ==================== -->
+  <div id="viewDisk" style="display:none;">
+    <div class="card" style="border-left:4px solid #38bdf8;background:#0d1525;padding:16px 20px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px;">
+        <div style="font-size:13px;color:#cbd5e1;line-height:1.65;flex:1;min-width:320px;">
+          <strong style="color:#38bdf8;font-size:14.5px;">💡 這是什麼功能？該給什麼訊息？</strong><br>
+          明明 <code>rm</code> 刪除檔案了，<code>df -h</code> 還是 100% 爆滿？<br>
+          👉 <strong>取得磁碟狀態指令（點擊複製）：</strong><br>
+          <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
+            <button class="btn btn-sm btn-secondary" onclick="copySnippet('df -h && df -i && lsof +L1')">📋 複製：df -h + df -i + lsof +L1 (推薦一鍵打包)</button>
+            <button class="btn btn-sm btn-secondary" onclick="copySnippet('lsof | grep deleted')">📋 複製：lsof | grep deleted</button>
+          </div>
+        </div>
+        <div>
+          <button class="btn btn-primary" onclick="loadSample('ghost')">📋 點我填入幽靈磁碟範例 (Java咬住46GB日誌)</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <div>
+          <h2>💽 df -h 與 lsof (deleted) 輸出貼入區</h2>
+          <p>自動比對幽靈日誌佔用、Inode 耗盡（df -i 100%）與進程咬住之檔案描述符 (FD)。</p>
+        </div>
+      </div>
+      <textarea id="diskInput" spellcheck="false" placeholder="直接貼上 df -h 與 lsof +L1 (或 lsof | grep deleted)：
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda1        50G   50G     0 100% /
+tmpfs           7.8G     0  7.8G   0% /dev/shm
+
+COMMAND   PID USER   FD   TYPE DEVICE   SIZE/OFF   NODE NAME
+java     1821 root    4w   REG    8,1 4829182910 128912 /var/log/catalina.out (deleted)
+nginx    2910 root    7w   REG    8,1  291029100  128913 /var/log/nginx/access.log (deleted)"></textarea>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="analyzeDisk()">⚡ 開始磁碟幽靈空間急救診斷</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('diskInput').value=''">🗑️ 清空</button>
+      </div>
+    </div>
+
+    <div id="diskResults" style="display:none;"></div>
+  </div>
+
+  <!-- ==================== TAB 3: 服務崩潰捕手 ==================== -->
+  <div id="viewSystemd" style="display:none;">
+    <div class="card" style="border-left:4px solid #38bdf8;background:#0d1525;padding:16px 20px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px;">
+        <div style="font-size:13px;color:#cbd5e1;line-height:1.65;flex:1;min-width:320px;">
+          <strong style="color:#38bdf8;font-size:14.5px;">💡 這是什麼功能？該給什麼訊息？</strong><br>
+          支援貼入 <code>systemctl status &lt;服務&gt;</code>、<code>systemctl --failed</code>、<code>journalctl</code> 或 Docker/應用報錯日誌！<br>
+          👉 <strong>現場常用指令（點擊複製後貼入下方）：</strong><br>
+          <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
+            <button class="btn btn-sm btn-secondary" onclick="copySnippet('systemctl status nginx --no-pager')">📋 複製：systemctl status &lt;服務&gt; (最常用)</button>
+            <button class="btn btn-sm btn-secondary" onclick="copySnippet('systemctl --failed --no-pager')">📋 複製：systemctl --failed (查全機崩潰清單)</button>
+            <button class="btn btn-sm btn-secondary" onclick="copySnippet('journalctl -xe -n 50 --no-pager')">📋 複製：journalctl -xe (查最新 50 行崩潰日誌)</button>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="loadSample('systemd_status')">📋 示範 1: Port 80 被搶 (systemctl status)</button>
+          <button class="btn btn-secondary" onclick="loadSample('systemd_syntax')">📋 示範 2: 設定檔語法報錯 (nginx -t)</button>
+          <button class="btn btn-secondary" onclick="loadSample('systemd_crashloop')">📋 示範 3: CrashLoop 重啟死循環</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <div>
+          <h2>🚨 服務狀態或錯誤日誌貼入區 (systemctl / journalctl / docker)</h2>
+          <p>支援 systemctl status 輸出、systemctl --failed 表格，以及包含 emerg、syntax error、Address already in use 之任何日誌。</p>
+        </div>
+      </div>
+      <textarea id="systemdInput" spellcheck="false" placeholder="直接貼上 systemctl status <服務名稱> 或 systemctl --failed：
+● nginx.service - A high performance web server and a reverse proxy server
+     Loaded: loaded (/lib/systemd/system/nginx.service; enabled; vendor preset: enabled)
+     Active: failed (Result: exit-code) since Wed 2026-10-28 11:52:03 CST; 5min ago
+    Process: 12891 ExecStart=/usr/sbin/nginx -g daemon on; master_process on; (code=exited, status=1/FAILURE)
+   Main PID: 12891 (code=exited, status=1/FAILURE)
+
+Oct 28 11:52:02 srv01 nginx[12891]: nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
+Oct 28 11:52:03 srv01 systemd[1]: nginx.service: Failed with result 'exit-code'.
+Oct 28 11:52:03 srv01 systemd[1]: Failed to start A high performance web server."></textarea>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="analyzeSystemd()">⚡ 開始服務崩潰深度透視</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('systemdInput').value=''">🗑️ 清空</button>
+      </div>
+    </div>
+
+    <div id="systemdResults" style="display:none;"></div>
+  </div>
+
+  <!-- ==================== TAB 4: OOM 殺人案發現場 ==================== -->
+  <div id="viewOOM" style="display:none;">
+    <div class="card" style="border-left:4px solid #38bdf8;background:#0d1525;padding:16px 20px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px;">
+        <div style="font-size:13px;color:#cbd5e1;line-height:1.65;flex:1;min-width:320px;">
+          <strong style="color:#38bdf8;font-size:14.5px;">💡 這是什麼功能？該給什麼訊息？</strong><br>
+          資料庫或 Java 突然消失，沒有留下錯誤日誌？99% 是被 Linux 核心 OOM Killer 強行處決了！<br>
+          👉 <strong>現場診斷指令（點擊複製）：</strong><br>
+          <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
+            <button class="btn btn-sm btn-secondary" onclick="copySnippet('dmesg -T | grep -i oom && free -m')">📋 複製：dmesg -T | grep -i oom && free -m (推薦)</button>
+            <button class="btn btn-sm btn-secondary" onclick="copySnippet('free -m')">📋 複製：free -m (實體與Swap容量)</button>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="loadSample('oom_mysql')">📋 示範 1: MySQL 遭槍斃 (實體 RAM 耗盡)</button>
+          <button class="btn btn-secondary" onclick="loadSample('oom_cgroup')">📋 示範 2: Java 遭處決 (容器 Cgroup 限制)</button>
+          <button class="btn btn-secondary" onclick="loadSample('oom_healthy')">📋 示範 3: 記憶體健康巡檢 (無處決)</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <div>
+          <h2>🔪 dmesg OOM 日誌與 free -m 輸入區</h2>
+          <p>支援 dmesg 處決記錄、journalctl 核心錯誤，以及 free -m / free -h 記憶體與 Swap 狀態。</p>
+        </div>
+      </div>
+      <textarea id="oomInput" spellcheck="false" placeholder="直接貼上 dmesg -T | grep -i oom 與 free -m：
+[Wed Oct 28 11:58:32 2026] Out of memory: Kill process 18291 (mysqld) score 851 or sacrifice child
+[Wed Oct 28 11:58:32 2026] Killed process 18291 (mysqld) total-vm:482910kB, anon-rss:382910kB, file-rss:0kB
+[Wed Oct 28 11:58:32 2026] oom_reaper: reaped process 18291 (mysqld), now anon-rss:0kB, file-rss:0kB
+
+              total        used        free      shared  buff/cache   available
+Mem:          15820       14910         150         310         760         320
+Swap:          2047        2047           0"></textarea>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="analyzeOOM()">⚡ 還原 OOM 案發現場與記憶體診斷</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('oomInput').value=''">🗑️ 清空</button>
+      </div>
+    </div>
+
+    <div id="oomResults" style="display:none;"></div>
+  </div>
+
+  <!-- ==================== TAB 5: 重開機安全驗收 ==================== -->
+  <div id="viewReboot" style="display:none;">
+    <div class="card" style="border-left:4px solid #38bdf8;background:#0d1525;padding:16px 20px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px;">
+        <div style="font-size:13px;color:#cbd5e1;line-height:1.65;flex:1;min-width:320px;">
+          <strong style="color:#38bdf8;font-size:14.5px;">💡 這是什麼功能？該給什麼訊息？</strong><br>
+          機器跑了 500 天不敢重開機？怕重開直接進入 Emergency Mode 死機？<br>
+          👉 <strong>取得掛載設定指令：</strong><br>
+          <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
+            <button class="btn btn-sm btn-secondary" onclick="copySnippet('cat /etc/fstab')">📋 複製：cat /etc/fstab</button>
+          </div>
+        </div>
+        <div>
+          <button class="btn btn-primary" onclick="loadSample('fstab')">📋 點我填入 fstab 地雷範例 (NFS缺少_netdev,nofail)</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <div>
+          <h2>💣 /etc/fstab 與掛載資訊輸入區</h2>
+        </div>
+      </div>
+      <textarea id="rebootInput" spellcheck="false" placeholder="直接貼上 /etc/fstab 與 /proc/mounts 內容：
+# /etc/fstab
+UUID=a1b2c3d4-0001 / ext4 errors=remount-ro 0 1
+UUID=a1b2c3d4-0002 /boot ext4 defaults 0 2
+192.168.1.100:/shared/nfs /mnt/nfs nfs defaults 0 0
+/dev/sdb1 /data ext4 defaults 0 2"></textarea>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="analyzeReboot()">⚡ 重開機安全性 100 分驗收</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('rebootInput').value=''">🗑️ 清空</button>
+      </div>
+    </div>
+
+    <div id="rebootResults" style="display:none;"></div>
+  </div>
+
+</main>
+
+<script>
+let lastReportText = "";
+let currentHistoryData = null;
+
+function switchTab(tab) {
+  const tabMap = {
+    'panorama': { btn: 'tabBtnPanorama', view: 'viewPanorama' },
+    'history':  { btn: 'tabBtnHistory',  view: 'viewHistory' },
+    'disk':     { btn: 'tabBtnDisk',     view: 'viewDisk' },
+    'systemd':  { btn: 'tabBtnSystemd',  view: 'viewSystemd' },
+    'oom':      { btn: 'tabBtnOOM',      view: 'viewOOM' },
+    'reboot':   { btn: 'tabBtnReboot',   view: 'viewReboot' }
+  };
+  Object.keys(tabMap).forEach(t => {
+    const item = tabMap[t];
+    const btn = document.getElementById(item.btn);
+    const view = document.getElementById(item.view);
+    if (btn) btn.classList.toggle('active', t === tab);
+    if (view) view.style.display = (t === tab) ? 'block' : 'none';
+  });
+}
+
+function showToast(msg) {
+  const existing = document.getElementById('globalToast');
+  if (existing) existing.remove();
+  const div = document.createElement('div');
+  div.id = 'globalToast';
+  div.className = 'toast-msg';
+  div.innerHTML = `<span>🔔</span><span>${msg}</span>`;
+  document.body.appendChild(div);
+  setTimeout(() => {
+    div.style.transition = 'opacity 0.4s';
+    div.style.opacity = '0';
+    setTimeout(() => div.remove(), 400);
+  }, 3000);
+}
+
+function copySnippet(text) {
+  if (!text) return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      showToast('已複製到剪貼簿！在終端機按 Ctrl+V 貼上執行即可。');
+    }).catch(() => fallbackCopy(text));
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function fallbackCopy(text) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('已複製到剪貼簿！在終端機按 Ctrl+V 貼上執行即可。');
+  } catch(e) {
+    showToast('複製指令: ' + text);
+  }
+}
+
+function copyLineReport() {
+  if (!lastReportText) {
+    showToast('請先進行診斷後再複製回報單！');
+    return;
+  }
+  navigator.clipboard.writeText(lastReportText).then(() => {
+    showToast('✅ 已複製現場回報單！直接在 LINE / Teams 視窗按 Ctrl+V 發送！');
+  });
+}
+
+async function loadSample(type) {
+  try {
+    const res = await fetch(`/api/sample?type=${type}`);
+    const data = await res.json();
+    if (data.content) {
+      if (type === 'bundle' || type === 'all' || type === 'techsupport') {
+        document.getElementById('bundleInput').value = data.content;
+        switchTab('panorama');
+        analyzeBundle();
+      } else if (type === 'history') {
+        document.getElementById('historyInput').value = data.content;
+        analyzeHistory();
+      } else if (type === 'ghost' || type === 'disk') {
+        document.getElementById('diskInput').value = data.content;
+        analyzeDisk();
+      } else if (type.startsWith('systemd')) {
+        document.getElementById('systemdInput').value = data.content;
+        analyzeSystemd();
+      } else if (type === 'oom' || type.startsWith('oom')) {
+        document.getElementById('oomInput').value = data.content;
+        analyzeOOM();
+      } else if (type === 'fstab' || type === 'reboot') {
+        document.getElementById('rebootInput').value = data.content;
+        analyzeReboot();
+      }
+    }
+  } catch(e) {
+    showToast('載入範例失敗');
+  }
+}
+
+// ----------------------------------------------------------------------------
+// 0. Master Panorama (All-in-One Tech-Support Synthesis)
+// ----------------------------------------------------------------------------
+async function autoScanHost() {
+  try {
+    showToast('正在執行現場本機全自動探測...');
+    const res = await fetch('/api/auto-scan-host', { method: 'POST' });
+    const data = await res.json();
+    if (data.is_live && data.synthesis) {
+      document.getElementById('bundleInput').value = data.bundle_raw || '';
+      switchTab('panorama');
+      renderMasterPanorama(data.synthesis);
+      showToast('現場本機即時掃描完成！');
+    } else {
+      showToast(data.message || '本機探測完成');
+      if (!data.is_live) {
+        loadSample('bundle');
+      }
+    }
+  } catch(e) {
+    showToast('現場掃描失敗: ' + e.message);
+  }
+}
+
+async function analyzeBundle() {
+  const text = document.getElementById('bundleInput').value.trim();
+  if (!text) { showToast('請先輸入或載入全景資訊！'); return; }
+  try {
+    const res = await fetch('/api/diagnose/all-in-one', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    const data = await res.json();
+    renderMasterPanorama(data);
+  } catch(e) {
+    showToast('全景會診失敗: ' + e.message);
+  }
+}
+
+function renderMasterPanorama(data) {
+  const container = document.getElementById('panoramaResults');
+  container.style.display = 'block';
+
+  const v = data.master_verdict || {};
+  const vColor = v.color || '#ef4444';
+  const chains = data.incident_chains || [];
+  const worklist = data.prioritized_worklist || [];
+  const dims = data.dimensions || {};
+  const score = data.health_score || 0;
+
+  // Format LINE/Teams Executive Handover Report
+  const nowStr = new Date().toLocaleString();
+  let rpt = `【SysScope 全主機急診綜合交班通報】\n`;
+  rpt += `⏰ 時間：${nowStr}\n`;
+  rpt += `📊 主機健康指數：${score} / 100 (${v.level || 'CRITICAL'})\n`;
+  rpt += `📌 綜合大結論：${v.title}\n`;
+  rpt += `👤 責任判定：${v.party}\n`;
+  rpt += `🗣️ 白話剖析：${v.reason}\n`;
+  rpt += `━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  if (chains.length > 0) {
+    rpt += `⚡ 跨維度事故連鎖因果鏈 (${chains.length} 處)：\n`;
+    chains.forEach((c, idx) => {
+      rpt += `${idx + 1}. [${c.severity}] ${c.title}\n   ➔ 軌跡：${c.flow}\n`;
+    });
+    rpt += `━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  }
+  if (worklist.length > 0) {
+    rpt += `📋 優先排障處方籤 (按急迫度)：\n`;
+    worklist.forEach((w, idx) => {
+      rpt += `[${w.priority}] ${w.action}\n`;
+      if (w.commands && w.commands.length > 0) {
+        w.commands.forEach(cmd => {
+          rpt += `   $ ${cmd}\n`;
+        });
+      }
+    });
+    rpt += `━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  }
+  rpt += `💡 由 SysScope 系統主機全方位異常透視儀 (Cisco Tech-Support 架構) 自動生成`;
+  lastReportText = rpt;
+
+  // Build HTML
+  let html = '';
+
+  // 1. Master Verdict Card
+  html += `
+    <div class="verdict-card" style="border-left-color:${vColor};">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;">
+        <div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;">
+          <div style="background:#090d18;border:2px solid ${vColor};border-radius:12px;padding:12px 20px;text-align:center;min-width:130px;">
+            <div style="font-size:11px;color:#94a3b8;font-weight:700;">綜合健康指數</div>
+            <div style="font-size:38px;font-weight:900;color:${vColor};line-height:1.1;">
+              ${score}<span style="font-size:16px;color:#64748b;font-weight:normal;">/100</span>
+            </div>
+            <div style="margin-top:4px;"><span class="badge ${score < 60 ? 'badge-crit' : score < 85 ? 'badge-warn' : 'badge-ok'}">${v.level || 'CRITICAL'}</span></div>
+          </div>
+          <div style="flex:1;min-width:280px;">
+            <div class="verdict-title" style="color:#f8fafc;">${escapeHtml(v.title)}</div>
+            <div class="verdict-party" style="background:rgba(255,255,255,0.08);color:${vColor};border:1px solid ${vColor};">
+              責任判定：${escapeHtml(v.party)}
+            </div>
+            <div class="verdict-reason">${escapeHtml(v.reason)}</div>
+          </div>
+        </div>
+        <div>
+          <button class="btn btn-primary" style="background:#059669;padding:10px 18px;font-size:13px;" onclick="copyLineReport()">
+            📋 一鍵複製完整交班大通報 (LINE / Teams)
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // 2. 跨維度事故連鎖因果鏈
+  if (chains.length > 0) {
+    html += `
+      <div class="card" style="border-left:5px solid #f59e0b;background:#131828;">
+        <div class="card-hdr">
+          <h2 style="color:#fbbf24;">⚡ 跨維度連鎖反應因果鏈推演 (${chains.length} 處連鎖事故)</h2>
+          <p>打破各單項孤島，將人為指令、服務崩潰、OOM 與空間枯竭串聯成完整證據鏈！</p>
+        </div>
+        ${chains.map(c => {
+          const badgeClass = c.severity === 'CRITICAL' ? 'badge-crit' : c.severity === 'HIGH' ? 'badge-warn' : 'badge-info';
+          return `
+            <div class="chain-box">
+              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+                <strong style="color:#f8fafc;font-size:14px;">${escapeHtml(c.title)}</strong>
+                <span class="badge ${badgeClass}">${c.severity}</span>
+              </div>
+              <div class="chain-flow">
+                <span>🔗 因果軌跡：</span>
+                <strong>${escapeHtml(c.flow)}</strong>
+              </div>
+              <div style="font-size:12.5px;color:#cbd5e1;line-height:1.55;margin-top:4px;">
+                ${escapeHtml(c.explanation)}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  // 3. 6 大命脈綜合健康矩陣
+  html += `
+    <div class="card">
+      <div class="card-hdr">
+        <h2>🧭 主機 6 大生命線健康矩陣 (6-Dimension Health Matrix)</h2>
+        <p>點擊各項目之「深入分析」可直接切換至該維度專屬鑑識工作台</p>
+      </div>
+      <div class="matrix-grid">
+        <!-- 1. History -->
+        <div class="matrix-card">
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:15px;">🕵️ 指令歷史</span>
+              <span class="badge ${(dims.history && dims.history.flagged_events && dims.history.flagged_events.length>0) ? 'badge-crit' : 'badge-ok'}">
+                ${(dims.history && dims.history.flagged_events && dims.history.flagged_events.length>0) ? dims.history.flagged_events.length + ' 筆高危' : '安全'}
+              </span>
+            </div>
+            <div style="font-size:11.5px;color:#94a3b8;margin-top:8px;line-height:1.4;">
+              ${(dims.history && dims.history.verdict) ? escapeHtml(dims.history.verdict.title) : '無歷史紀錄'}
+            </div>
+          </div>
+          <button class="btn btn-sm btn-secondary" style="margin-top:12px;width:100%;justify-content:center;" onclick="switchTab('history')">深入分析 ➔</button>
+        </div>
+
+        <!-- 2. Systemd -->
+        <div class="matrix-card">
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:15px;">🚨 系統服務</span>
+              <span class="badge ${(dims.systemd && dims.systemd.failed_count>0) ? 'badge-crit' : 'badge-ok'}">
+                ${(dims.systemd && dims.systemd.failed_count>0) ? dims.systemd.failed_count + ' 項崩潰' : '正常'}
+              </span>
+            </div>
+            <div style="font-size:11.5px;color:#94a3b8;margin-top:8px;line-height:1.4;">
+              ${(dims.systemd && dims.systemd.verdict) ? escapeHtml(dims.systemd.verdict.title) : '無崩潰服務'}
+            </div>
+          </div>
+          <button class="btn btn-sm btn-secondary" style="margin-top:12px;width:100%;justify-content:center;" onclick="switchTab('systemd')">深入分析 ➔</button>
+        </div>
+
+        <!-- 3. Disk -->
+        <div class="matrix-card">
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:15px;">💽 磁碟空間</span>
+              <span class="badge ${(dims.disk && dims.disk.ghost_files && dims.disk.ghost_files.length>0) ? 'badge-crit' : 'badge-ok'}">
+                ${(dims.disk && dims.disk.ghost_files && dims.disk.ghost_files.length>0) ? dims.disk.ghost_files.length + ' 幽靈日誌' : '正常'}
+              </span>
+            </div>
+            <div style="font-size:11.5px;color:#94a3b8;margin-top:8px;line-height:1.4;">
+              ${(dims.disk && dims.disk.verdict) ? escapeHtml(dims.disk.verdict.title) : '磁碟健康'}
+            </div>
+          </div>
+          <button class="btn btn-sm btn-secondary" style="margin-top:12px;width:100%;justify-content:center;" onclick="switchTab('disk')">深入分析 ➔</button>
+        </div>
+
+        <!-- 4. OOM -->
+        <div class="matrix-card">
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:15px;">🔪 記憶體 OOM</span>
+              <span class="badge ${(dims.oom && dims.oom.oom_events && dims.oom.oom_events.length>0) ? 'badge-crit' : 'badge-ok'}">
+                ${(dims.oom && dims.oom.oom_events && dims.oom.oom_events.length>0) ? dims.oom.oom_events.length + ' 起處決' : '無處決'}
+              </span>
+            </div>
+            <div style="font-size:11.5px;color:#94a3b8;margin-top:8px;line-height:1.4;">
+              ${(dims.oom && dims.oom.verdict) ? escapeHtml(dims.oom.verdict.title) : '記憶體正常'}
+            </div>
+          </div>
+          <button class="btn btn-sm btn-secondary" style="margin-top:12px;width:100%;justify-content:center;" onclick="switchTab('oom')">深入分析 ➔</button>
+        </div>
+
+        <!-- 5. Reboot -->
+        <div class="matrix-card">
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:15px;">💣 重開安全</span>
+              <span class="badge ${(dims.reboot && dims.reboot.hazards && dims.reboot.hazards.length>0) ? 'badge-crit' : 'badge-ok'}">
+                ${(dims.reboot && dims.reboot.readiness_score !== undefined) ? dims.reboot.readiness_score + ' 分' : '正常'}
+              </span>
+            </div>
+            <div style="font-size:11.5px;color:#94a3b8;margin-top:8px;line-height:1.4;">
+              ${(dims.reboot && dims.reboot.verdict) ? escapeHtml(dims.reboot.verdict.title) : '掛載正常'}
+            </div>
+          </div>
+          <button class="btn btn-sm btn-secondary" style="margin-top:12px;width:100%;justify-content:center;" onclick="switchTab('reboot')">深入分析 ➔</button>
+        </div>
+
+        <!-- 6. Network -->
+        <div class="matrix-card">
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:15px;">🌐 核心網路</span>
+              <span class="badge ${(dims.network && dims.network.localhost_traps && dims.network.localhost_traps.length>0) ? 'badge-warn' : 'badge-ok'}">
+                ${(dims.network && dims.network.localhost_traps && dims.network.localhost_traps.length>0) ? dims.network.localhost_traps.length + ' 綁定陷阱' : '正常'}
+              </span>
+            </div>
+            <div style="font-size:11.5px;color:#94a3b8;margin-top:8px;line-height:1.4;">
+              ${(dims.network && dims.network.verdict) ? escapeHtml(dims.network.verdict.title) : '監聽正常'}
+            </div>
+          </div>
+          <button class="btn btn-sm btn-secondary" style="margin-top:12px;width:100%;justify-content:center;" onclick="showToast('網路維度已納入全景綜合推演')">監聽檢驗 ➔</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // 4. 優先排障處方籤 (Prioritized Worklist)
+  if (worklist.length > 0) {
+    html += `
+      <div class="card" style="border-left:5px solid #10b981;background:#0d1c24;">
+        <div class="card-hdr">
+          <h2 style="color:#34d399;">📋 現場急診優先級處方籤 (Prioritized Worklist - ${worklist.length} 項行動)</h2>
+          <p>已按事故致死程度智能排序，現場工程師直接依序點擊複製指令執行即可立即止血！</p>
+        </div>
+        ${worklist.map(w => {
+          const isP1 = w.priority.includes('P1');
+          return `
+            <div style="background:rgba(0,0,0,0.35);border:1px solid #1e293b;border-radius:8px;padding:14px;margin-bottom:10px;">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
+                <span class="badge ${isP1 ? 'badge-crit' : 'badge-warn'}">${escapeHtml(w.priority)}</span>
+                <strong style="color:#f8fafc;font-size:13.5px;">${escapeHtml(w.action)}</strong>
+              </div>
+              ${(w.commands && w.commands.length > 0) ? `
+                <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px;">
+                  ${w.commands.map(cmd => `
+                    <div style="display:flex;align-items:center;justify-content:space-between;background:#070b14;border:1px solid #1e293b;padding:6px 10px;border-radius:6px;gap:8px;">
+                      <code style="color:#38bdf8;font-size:12px;word-break:break-all;">${escapeHtml(cmd)}</code>
+                      ${!cmd.startsWith('#') ? `
+                        <button class="btn btn-sm btn-secondary" style="white-space:nowrap;" onclick="copySnippet('${escapeQuote(cmd)}')">
+                          📋 複製指令
+                        </button>
+                      ` : ''}
+                    </div>
+                  `).join('')}
+                </div>
+              ` : ''}
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  container.innerHTML = html;
+  container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ----------------------------------------------------------------------------
+// 1. Analyze History
+// ----------------------------------------------------------------------------
+async function analyzeHistory() {
+  const text = document.getElementById('historyInput').value.trim();
+  if (!text) { showToast('請先輸入或載入指令歷史文字！'); return; }
+  try {
+    const res = await fetch('/api/diagnose/history', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    const data = await res.json();
+    currentHistoryData = data;
+    renderVerdictAndDetails('historyResults', data, renderHistoryDetails(data));
+  } catch(e) {
+    showToast('歷史鑑識分析失敗: ' + e.message);
+  }
+}
+
+function renderHistoryDetails(data) {
+  const flagged = data.flagged_events || [];
+  const counts = data.category_counts || {};
+  const correlations = data.correlation_insights || [];
+  const timeline = data.timeline || [];
+
+  let html = '';
+
+  // 1. 事故導火線關聯鏈 (Correlation Insights)
+  if (correlations.length > 0) {
+    html += `
+      <div class="card" style="border-left:5px solid #f59e0b;background:#151b2a;">
+        <div class="card-hdr">
+          <h2 style="color:#fbbf24;">⚡ 事故關聯導火線鏈分析 (${correlations.length} 處可疑串聯)</h2>
+        </div>
+        ${correlations.map(c => `
+          <div style="background:rgba(0,0,0,0.3);padding:12px 14px;border-radius:6px;margin-bottom:8px;line-height:1.6;color:#e2e8f0;font-size:13px;">
+            <div>${c.explanation}</div>
+            <div style="margin-top:6px;display:flex;gap:12px;font-family:monospace;font-size:12px;">
+              <span style="color:#94a3b8;">起因 (Line ${c.cause_line}): <strong style="color:#38bdf8;">${escapeHtml(c.cause_cmd)}</strong></span>
+              <span style="color:#94a3b8;">觸發 (Line ${c.trigger_line}): <strong style="color:#ef4444;">${escapeHtml(c.trigger_cmd)}</strong></span>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  // 2. 高危翻車指令清單
+  if (flagged.length > 0) {
+    html += `
+      <div class="card">
+        <div class="card-hdr">
+          <h2 style="color:#f87171;">🚨 抓出的高危險/自殺翻車指令 (${flagged.length} 筆)</h2>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>行號 / 時間</th>
+              <th>等級</th>
+              <th>指令內容</th>
+              <th>致命後果說明</th>
+              <th>緊急止血回滾指令</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${flagged.map(f => `
+              <tr>
+                <td><code>#${f.line_no} (${f.timestamp})</code></td>
+                <td><span class="badge ${f.severity==='CRITICAL'?'badge-crit':'badge-warn'}">${f.severity}</span></td>
+                <td><code style="color:#38bdf8;font-weight:700;">${escapeHtml(f.command)}</code></td>
+                <td style="color:#fca5a5;max-width:320px;">${escapeHtml(f.impact)}</td>
+                <td><button class="btn btn-sm btn-secondary" onclick="copySnippet('${escapeQuote(f.remedy)}')">📋 複製回滾指令</button></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  // 3. 維運操作行為雷達統計
+  html += `
+    <div class="card">
+      <div class="card-hdr">
+        <h2>📊 操作行為分類雷達統計 (共 ${data.total_commands} 筆指令)</h2>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <span class="pill" style="border-color:#38bdf8;">⚙️ 設定檔修改: <strong>${counts.CONFIG || 0}</strong></span>
+        <span class="pill" style="border-color:#10b981;">🔄 服務生命週期: <strong>${counts.SERVICE || 0}</strong></span>
+        <span class="pill" style="border-color:#f59e0b;">🌐 網路與防火牆: <strong>${counts.NETWORK || 0}</strong></span>
+        <span class="pill" style="border-color:#a855f7;">📦 軟體套件管理: <strong>${counts.PACKAGE || 0}</strong></span>
+        <span class="pill" style="border-color:#ec4899;">🛡️ 權限安全帳號: <strong>${counts.SECURITY || 0}</strong></span>
+        <span class="pill" style="border-color:#eab308;">💾 磁碟與檔案刪除: <strong>${counts.STORAGE || 0}</strong></span>
+        <span class="pill" style="border-color:#06b6d4;">🗄️ 資料庫操作: <strong>${counts.DATABASE || 0}</strong></span>
+        <span class="pill" style="border-color:#64748b;">🔍 日誌系統查詢: <strong>${counts.DIAGNOSTIC || 0}</strong></span>
+      </div>
+    </div>
+  `;
+
+  // 4. 歷史指令時間軸與即時篩選
+  html += `
+    <div class="card">
+      <div class="card-hdr">
+        <h2>⏱️ 歷史指令變更時間軸清單 (最近 ${timeline.length} 筆)</h2>
+        <p>點擊下方標籤可即時篩選指令類別</p>
+      </div>
+      <div class="filter-bar">
+        <span class="filter-chip active" onclick="filterTimeline('ALL', this)">全部 (${timeline.length})</span>
+        <span class="filter-chip" onclick="filterTimeline('DANGER', this)">🚨 高危警示 (${flagged.length})</span>
+        <span class="filter-chip" onclick="filterTimeline('CONFIG', this)">⚙️ 設定變更 (${counts.CONFIG || 0})</span>
+        <span class="filter-chip" onclick="filterTimeline('SERVICE', this)">🔄 服務重啟 (${counts.SERVICE || 0})</span>
+        <span class="filter-chip" onclick="filterTimeline('NETWORK', this)">🌐 網路異動 (${counts.NETWORK || 0})</span>
+        <span class="filter-chip" onclick="filterTimeline('PACKAGE', this)">📦 套件異動 (${counts.PACKAGE || 0})</span>
+        <span class="filter-chip" onclick="filterTimeline('STORAGE', this)">💾 檔案磁區 (${counts.STORAGE || 0})</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:70px;">序號</th>
+            <th style="width:140px;">時間</th>
+            <th style="width:110px;">類別標籤</th>
+            <th>執行指令內容</th>
+          </tr>
+        </thead>
+        <tbody id="timelineTableBody">
+          ${renderTimelineRows(timeline)}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  return html;
+}
+
+function renderTimelineRows(items) {
+  if (!items || items.length === 0) {
+    return '<tr><td colspan="4" style="text-align:center;color:#64748b;padding:16px;">無符合篩選條件之指令</td></tr>';
+  }
+  return items.map(t => {
+    let tagBadge = `<span class="badge badge-info">${t.action_desc || t.action_type}</span>`;
+    if (t.is_dangerous) {
+      tagBadge = `<span class="badge badge-crit">🚨 ${t.danger_info ? t.danger_info.title : '高危指令'}</span>`;
+    } else if (t.action_type === 'CONFIG') {
+      tagBadge = `<span class="badge badge-warn">⚙️ 設定變更</span>`;
+    } else if (t.action_type === 'SERVICE') {
+      tagBadge = `<span class="badge badge-ok">🔄 服務操作</span>`;
+    }
+    return `
+      <tr class="timeline-row" data-type="${t.action_type}" data-danger="${t.is_dangerous}">
+        <td><code>#${t.line_no}</code></td>
+        <td style="color:#94a3b8;font-size:11.5px;">${t.timestamp}</td>
+        <td>${tagBadge}</td>
+        <td><code style="color:${t.is_dangerous ? '#f87171' : '#e2e8f0'};font-weight:${t.is_dangerous ? 'bold' : 'normal'};">${escapeHtml(t.command)}</code></td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function filterTimeline(filterType, element) {
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  if (element) element.classList.add('active');
+
+  const rows = document.querySelectorAll('.timeline-row');
+  rows.forEach(r => {
+    const rType = r.getAttribute('data-type');
+    const rDanger = r.getAttribute('data-danger') === 'true';
+    if (filterType === 'ALL') {
+      r.style.display = '';
+    } else if (filterType === 'DANGER') {
+      r.style.display = rDanger ? '' : 'none';
+    } else {
+      r.style.display = (rType === filterType) ? '' : 'none';
+    }
+  });
+}
+
+// ----------------------------------------------------------------------------
+// 2. Analyze Disk
+// ----------------------------------------------------------------------------
+async function analyzeDisk() {
+  const text = document.getElementById('diskInput').value.trim();
+  if (!text) { showToast('請先輸入或載入磁碟日誌！'); return; }
+  try {
+    const res = await fetch('/api/diagnose/disk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    const data = await res.json();
+    renderVerdictAndDetails('diskResults', data, renderDiskDetails(data));
+  } catch(e) {
+    showToast('磁碟分析失敗: ' + e.message);
+  }
+}
+
+function renderDiskDetails(data) {
+  const ghosts = data.ghost_files || [];
+  const disks = data.df_disks || [];
+
+  let html = '';
+  if (ghosts.length > 0) {
+    html += `
+      <div class="card">
+        <div class="card-hdr">
+          <h2 style="color:#f87171;">👻 被進程咬住未釋放的幽靈日誌 (${ghosts.length} 個，累計佔用 ${data.total_ghost_mb} MB)</h2>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>進程名稱</th>
+              <th>PID</th>
+              <th>佔用空間</th>
+              <th>已刪除之檔案路徑</th>
+              <th>免重啟秒殺清空指令 (點我複製)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${ghosts.map(g => `
+              <tr>
+                <td><strong style="color:#38bdf8;">${g.command}</strong></td>
+                <td><code>${g.pid}</code></td>
+                <td><strong style="color:#ef4444;">${g.size_mb} MB</strong></td>
+                <td style="color:#cbd5e1;"><code>${escapeHtml(g.path)}</code></td>
+                <td>
+                  <button class="btn btn-sm btn-primary" onclick="copySnippet('${escapeQuote(g.remedy_cmd)}')">
+                    ⚡ 複製清空指令: <code>${escapeHtml(g.remedy_cmd)}</code>
+                  </button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+  return html;
+}
+
+// ----------------------------------------------------------------------------
+// 3. Analyze Systemd (服務崩潰捕手 & 錯誤日誌透視)
+// ----------------------------------------------------------------------------
+async function analyzeSystemd() {
+  const text = document.getElementById('systemdInput').value.trim();
+  if (!text) { showToast('請先輸入 systemctl 或錯誤日誌！'); return; }
+  try {
+    const res = await fetch('/api/diagnose/systemd', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    const data = await res.json();
+    renderVerdictAndDetails('systemdResults', data, renderSystemdDetails(data));
+  } catch(e) {
+    showToast('服務崩潰分析失敗: ' + e.message);
+  }
+}
+
+function renderSystemdDetails(data) {
+  const failed = data.failed_units || [];
+  const logs = data.key_error_logs || [];
+  const remedyCmds = data.remedy_commands || [];
+
+  let html = '';
+
+  // 1. 立即處置與排障指令包
+  if (remedyCmds.length > 0) {
+    html += `
+      <div class="card" style="border-left:5px solid #10b981;background:#0d1c24;">
+        <div class="card-hdr">
+          <h2 style="color:#34d399;">⚡ 現場立即除錯與修復指令包</h2>
+          <p>依據死因自動精確生成，點擊即可複製至 Linux 終端機執行</p>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">
+          ${remedyCmds.map(cmd => `
+            <button class="btn btn-primary" style="background:#047857;" onclick="copySnippet('${escapeQuote(cmd)}')">
+              📋 複製：<code>${escapeHtml(cmd)}</code>
+            </button>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  // 2. 崩潰服務狀態明細
+  if (failed.length > 0) {
+    html += `
+      <div class="card">
+        <div class="card-hdr"><h2>🚨 崩潰/異常服務狀態 (${failed.length} 筆)</h2></div>
+        <table>
+          <thead><tr><th>服務名稱 (Unit)</th><th>狀態</th><th>子狀態 / 退出代碼</th><th>說明 / 執行檔</th><th>日誌排查指令</th></tr></thead>
+          <tbody>
+            ${failed.map(u => `
+              <tr>
+                <td><strong style="color:#ef4444;font-size:13.5px;">${escapeHtml(u.unit)}</strong></td>
+                <td><span class="badge ${u.active_state==='failed'?'badge-crit':'badge-warn'}">${u.active_state}</span></td>
+                <td><code>${escapeHtml(u.sub_state)} ${u.exit_code ? `(${u.exit_code})` : ''}</code></td>
+                <td style="color:#cbd5e1;">${escapeHtml(u.description)}</td>
+                <td><button class="btn btn-sm btn-secondary" onclick="copySnippet('journalctl -u ${u.unit} -n 30 --no-pager')">📋 複製 journalctl 指令</button></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  // 3. 提取之關鍵報錯日誌
+  if (logs.length > 0) {
+    html += `
+      <div class="card">
+        <div class="card-hdr">
+          <h2 style="color:#f87171;">📜 提取出之關鍵崩潰日誌與報錯堆疊 (${logs.length} 行)</h2>
+        </div>
+        <div class="code-box" style="color:#fca5a5;max-height:240px;overflow-y:auto;background:#05070f;">${logs.map(l => escapeHtml(l)).join('\n')}</div>
+      </div>
+    `;
+  }
+
+  return html;
+}
+
+// ----------------------------------------------------------------------------
+// 4. Analyze OOM
+// ----------------------------------------------------------------------------
+async function analyzeOOM() {
+  const text = document.getElementById('oomInput').value.trim();
+  if (!text) { showToast('請先輸入 dmesg OOM 日誌！'); return; }
+  try {
+    const res = await fetch('/api/diagnose/oom', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    const data = await res.json();
+    renderVerdictAndDetails('oomResults', data, renderOOMDetails(data));
+  } catch(e) {
+    showToast('OOM 分析失敗: ' + e.message);
+  }
+}
+
+function renderOOMDetails(data) {
+  const ooms = data.oom_events || [];
+  const mem = data.mem_info || {};
+  const logs = data.raw_oom_logs || [];
+
+  let html = '';
+
+  // 1. 實體記憶體與 Swap 空間監控看板
+  if (mem.total) {
+    const isAvailCrit = mem.avail_pct < 10;
+    const isSwapCrit = mem.swap_used_pct > 80;
+    html += `
+      <div class="card">
+        <div class="card-hdr">
+          <h2>📊 實體記憶體與 Swap 空間監控看板</h2>
+          <span style="font-size:12px;color:#94a3b8;">真實可用率: <strong style="color:${isAvailCrit ? '#ef4444' : '#10b981'};">${mem.avail_pct}%</strong></span>
+        </div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+          <div class="pill" style="border-color:#38bdf8;padding:8px 14px;font-size:12px;">
+            💻 實體 RAM 總量: <strong>${Number(mem.total).toLocaleString()} MB</strong>
+          </div>
+          <div class="pill" style="border-color:#f59e0b;padding:8px 14px;font-size:12px;">
+            📈 已使用 (Used): <strong>${Number(mem.used).toLocaleString()} MB</strong>
+          </div>
+          <div class="pill" style="border-color:${isAvailCrit ? '#ef4444' : '#10b981'};padding:8px 14px;font-size:12px;background:${isAvailCrit ? 'rgba(239,68,68,0.1)' : 'transparent'};">
+            ⭐ 真正可用 (Available): <strong style="color:${isAvailCrit ? '#ef4444' : '#10b981'};">${Number(mem.available).toLocaleString()} MB (${mem.avail_pct}%)</strong>
+          </div>
+          <div class="pill" style="border-color:#64748b;padding:8px 14px;font-size:12px;">
+            🗂️ 緩存 (Buff/Cache): <strong>${Number(mem.buff_cache).toLocaleString()} MB</strong>
+          </div>
+          ${mem.swap_total ? `
+            <div class="pill" style="border-color:${isSwapCrit ? '#ef4444' : '#38bdf8'};padding:8px 14px;font-size:12px;background:${isSwapCrit ? 'rgba(239,68,68,0.15)' : 'transparent'};">
+              💽 Swap 分區: <strong style="color:${isSwapCrit ? '#ef4444' : '#38bdf8'};">${Number(mem.swap_used).toLocaleString()} / ${Number(mem.swap_total).toLocaleString()} MB (${mem.swap_used_pct}%)</strong>
+            </div>
+          ` : ''}
+        </div>
+        <div style="background:rgba(0,0,0,0.3);padding:10px 14px;border-radius:6px;font-size:12px;color:#cbd5e1;line-height:1.6;">
+          💡 <strong>現場人員知識庫：為什麼 Linux 不能只看 free？</strong><br>
+          Linux 核心為了極致效能，會將閒置 RAM 自動挪作硬碟快取 (buff/cache)。因此 <code>free</code> 數字很低是完全正常的！真正代表能立即分給新進程的空間是 <strong>available</strong>！若 available 跌破 5% 或 Swap 耗盡，核心就會啟動 OOM Killer 拔刀殺人！
+        </div>
+      </div>
+    `;
+  }
+
+  // 2. OOM 處決現場明細
+  if (ooms.length > 0) {
+    html += `
+      <div class="card">
+        <div class="card-hdr"><h2 style="color:#f87171;">🔪 OOM Killer 案發現場處決記錄 (${ooms.length} 起)</h2></div>
+        <table>
+          <thead><tr><th>案發時間</th><th>被處決被害者進程</th><th>進程 PID</th><th>死前實體佔用 (RSS)</th><th>處決類型判別</th></tr></thead>
+          <tbody>
+            ${ooms.map(o => `
+              <tr>
+                <td><code>${escapeHtml(o.timestamp)}</code></td>
+                <td><strong style="color:#ef4444;font-size:13px;">${escapeHtml(o.victim_cmd)}</strong></td>
+                <td><code>PID: ${escapeHtml(o.victim_pid)}</code></td>
+                <td><strong style="color:#f59e0b;">${o.freed_mb > 0 ? o.freed_mb + ' MB' : '大量實體'}</strong></td>
+                <td><span class="badge ${o.is_cgroup ? 'badge-warn' : 'badge-crit'}">${o.is_cgroup ? '🐳 容器 Cgroup 上限處決' : '💻 主機實體 RAM 枯竭處決'}</span></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } else if (!mem.total) {
+    html += `
+      <div class="card" style="color:#10b981;border-left:4px solid #10b981;">
+        🟢 未發現任何 OOM 處決日誌。若需巡檢記憶體用量，可執行 <code>free -m</code> 貼入檢驗。
+      </div>
+    `;
+  }
+
+  // 3. 立即排查指令包
+  html += `
+    <div class="card" style="border-left:5px solid #0284c7;background:#0d1b2a;">
+      <div class="card-hdr">
+        <h2 style="color:#38bdf8;">⚡ 現場記憶體排查與搶救指令包</h2>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">
+        <button class="btn btn-primary" style="background:#0284c7;" onclick="copySnippet('ps aux --sort=-%mem | head -n 10')">
+          📋 複製：ps aux --sort=-%mem | head -n 10 (查出吃最多 RAM 前 10 名)
+        </button>
+        <button class="btn btn-secondary" onclick="copySnippet('sudo swapon --show && free -m')">
+          📋 複製：swapon --show && free -m (檢視 Swap 掛載)
+        </button>
+        <button class="btn btn-secondary" data-cmd="dmesg -T | grep -Ei 'oom|killed process' | tail -n 20" onclick="copySnippet(this.dataset.cmd)">
+          📋 複製：dmesg -T | grep -Ei 'oom|killed process'
+        </button>
+      </div>
+    </div>
+  `;
+
+  // 4. 原始日誌追溯
+  if (logs.length > 0) {
+    html += `
+      <div class="card">
+        <div class="card-hdr"><h2 style="color:#cbd5e1;">📜 核心 dmesg 處決原始日誌 (${logs.length} 行)</h2></div>
+        <div class="code-box" style="color:#fca5a5;max-height:200px;overflow-y:auto;background:#05070f;">${logs.map(l => escapeHtml(l)).join('\n')}</div>
+      </div>
+    `;
+  }
+
+  return html;
+}
+
+// ----------------------------------------------------------------------------
+// 5. Analyze Reboot
+// ----------------------------------------------------------------------------
+async function analyzeReboot() {
+  const text = document.getElementById('rebootInput').value.trim();
+  if (!text) { showToast('請先輸入 fstab 內容！'); return; }
+  try {
+    const res = await fetch('/api/diagnose/reboot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fstab_text: text })
+    });
+    const data = await res.json();
+    renderVerdictAndDetails('rebootResults', data, renderRebootDetails(data));
+  } catch(e) {
+    showToast('重開機分析失敗: ' + e.message);
+  }
+}
+
+function renderRebootDetails(data) {
+  const hazards = data.hazards || [];
+  if (hazards.length === 0) return '<div class="card" style="color:#10b981;">🟢 /etc/fstab 檢驗完畢，所有掛載點均具備容錯參數，安全無虞。</div>';
+  return `
+    <div class="card">
+      <div class="card-hdr"><h2>💣 重開機致命地雷清單 (${hazards.length} 處)</h2></div>
+      <table>
+        <thead><tr><th>行號</th><th>嚴重度</th><th>地雷類型</th><th>影響說明</th><th>修正建議</th></tr></thead>
+        <tbody>
+          ${hazards.map(h => `
+            <tr>
+              <td><code>Line ${h.line_no}</code></td>
+              <td><span class="badge ${h.severity==='CRITICAL'?'badge-crit':'badge-warn'}">${h.severity}</span></td>
+              <td><strong>${h.title}</strong></td>
+              <td style="color:#fca5a5;">${escapeHtml(h.impact)}</td>
+              <td><code>${h.remedy}</code></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ----------------------------------------------------------------------------
+// Common Verdict & Report
+// ----------------------------------------------------------------------------
+function renderVerdictAndDetails(containerId, data, detailsHtml) {
+  const container = document.getElementById(containerId);
+  container.style.display = 'block';
+
+  const v = data.verdict || {};
+  const vColor = v.color || '#10b981';
+
+  // Format LINE Report text
+  const nowStr = new Date().toLocaleString();
+  lastReportText = `【SysScope 系統主機排障快報】\n⏰ 時間：${nowStr}\n📌 結論：${v.title}\n👤 責任歸屬：${v.party}\n🗣️ 白話原因：${v.reason}\n⚡ 立即處置：\n${v.action}\n----------------------------------------\n💡 報告由 SysScope 系統主機異常透視儀自動生成`;
+
+  container.innerHTML = `
+    <div class="verdict-card" style="border-left-color:${vColor};">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;">
+        <div style="flex:1;min-width:280px;">
+          <div class="verdict-title">${escapeHtml(v.title)}</div>
+          <div class="verdict-party" style="background:rgba(255,255,255,0.08);color:${vColor};border:1px solid ${vColor};">
+            責任歸屬：${escapeHtml(v.party)}
+          </div>
+          <div class="verdict-reason">${escapeHtml(v.reason)}</div>
+          <div class="verdict-action">⚡ 現場立即處置：<br>${escapeHtml(v.action)}</div>
+        </div>
+        <div>
+          <button class="btn btn-primary" style="background:#059669;padding:10px 18px;font-size:13px;" onclick="copyLineReport()">
+            📋 一鍵複製 LINE / Teams 現場回報單
+          </button>
+        </div>
+      </div>
+    </div>
+    ${detailsHtml}
+  `;
+
+  container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function escapeHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function escapeQuote(s) {
+  if (!s) return '';
+  return String(s).replace(/'/g, "\\'").replace(/\n/g, "\\n");
+}
+
+// Load System info on startup
+async function initSysInfo() {
+  try {
+    const res = await fetch('/api/sysinfo');
+    const data = await res.json();
+    if (data.hostname) {
+      document.getElementById('sysHostBadge').innerHTML = `主機：<strong>${data.hostname} (${data.os})</strong>`;
+    }
+  } catch(e){}
+}
+
+window.addEventListener('DOMContentLoaded', initSysInfo);
+</script>
+</body>
+</html>

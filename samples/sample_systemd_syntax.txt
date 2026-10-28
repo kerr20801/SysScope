@@ -1,0 +1,10 @@
+● nginx.service - A high performance web server and a reverse proxy server
+     Loaded: loaded (/lib/systemd/system/nginx.service; enabled; vendor preset: enabled)
+     Active: failed (Result: exit-code) since Wed 2026-10-28 12:15:10 CST; 2min ago
+    Process: 14022 ExecStartPre=/usr/sbin/nginx -t -q -g daemon on; master_process on; (code=exited, status=1/FAILURE)
+
+Oct 28 12:15:10 srv01 nginx[14022]: nginx: [emerg] unknown directive "proxy_pas" in /etc/nginx/conf.d/api.conf:18
+Oct 28 12:15:10 srv01 nginx[14022]: nginx: configuration file /etc/nginx/nginx.conf test failed
+Oct 28 12:15:10 srv01 systemd[1]: nginx.service: Control process exited, code=exited, status=1/FAILURE
+Oct 28 12:15:10 srv01 systemd[1]: nginx.service: Failed with result 'exit-code'.
+Oct 28 12:15:10 srv01 systemd[1]: Failed to start A high performance web server.

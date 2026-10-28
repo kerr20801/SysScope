@@ -1,0 +1,6 @@
+[Wed Oct 28 12:00:00 2026] Linux version 5.15.0-105-generic (buildd@lcy02-amd64-001)
+[Wed Oct 28 12:00:01 2026] Command line: BOOT_IMAGE=/vmlinuz-5.15.0-105-generic root=/dev/mapper/ubuntu--vg-ubuntu--lv ro
+
+              total        used        free      shared  buff/cache   available
+Mem:          32000        8200       12500         450       11300       23350
+Swap:          4096           0        4096
