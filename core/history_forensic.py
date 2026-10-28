@@ -12,6 +12,21 @@ import re
 from typing import Dict, Any, List
 
 class HistoryForensic:
+    @staticmethod
+    def redact_sensitive_data(cmd: str) -> str:
+        """自動脫敏命令列中的機敏密碼、金鑰與 Token (借鏡 sentinel-cli 零外洩原則)"""
+        # 1. 密碼參數脫敏: -pPassword, --password=..., --password ...
+        cmd = re.sub(r'(-p|--password[=\s]+|--passwd[=\s]+)(\S+)', r'\1***REDACTED***', cmd)
+        # 2. Redis 密碼: -a password
+        cmd = re.sub(r'(-a\s+)(\S+)', r'\1***REDACTED***', cmd)
+        # 3. HTTP Header Authorization: Bearer / Basic / Token
+        cmd = re.sub(r'(Authorization:\s*(?:Bearer|Basic|Token)\s+)([A-Za-z0-9_\-\.]+)', r'\1***REDACTED***', cmd, flags=re.IGNORECASE)
+        # 4. URL 嵌入密碼: http://user:pass@host
+        cmd = re.sub(r'(https?://[^:\s]+:)([^@\s]+)(@)', r'\1***REDACTED***\3', cmd)
+        # 5. Token/Key 賦值: token=..., api_key=..., secret=...
+        cmd = re.sub(r'((?:token|api_key|apikey|secret|password|passwd)[=\s]+)(\S+)', r'\1***REDACTED***', cmd, flags=re.IGNORECASE)
+        return cmd
+
     def __init__(self):
         # 30+ 種高危自殺 / 破壞性規則庫
         self.dangerous_rules = [
@@ -269,10 +284,11 @@ class HistoryForensic:
                     matched_rule = r
                     break
 
+            cmd_display = self.redact_sensitive_data(cmd_clean)
             entry = {
                 "line_no": idx,
                 "timestamp": ts,
-                "command": cmd_clean,
+                "command": cmd_display,
                 "action_type": action_type,
                 "action_desc": action_desc,
                 "is_dangerous": matched_rule is not None,
@@ -286,7 +302,7 @@ class HistoryForensic:
                 flagged_events.append({
                     "line_no": idx,
                     "timestamp": ts,
-                    "command": cmd_clean,
+                    "command": cmd_display,
                     "type": matched_rule["type"],
                     "severity": matched_rule["severity"],
                     "title": matched_rule["title"],
