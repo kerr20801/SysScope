@@ -1,0 +1,8 @@
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda1        98G   93G  1.1G  99% /
+tmpfs           7.8G     0  7.8G   0% /dev/shm
+/dev/sda2       488M  120M  333M  27% /boot
+
+COMMAND  PID  USER   FD   TYPE DEVICE        SIZE/OFF NLINK   NODE NAME
+java    1821  root    4w   REG    8,1 48291029192     0 128392 /var/log/catalina.out (deleted)
+python  2940  app     3w   REG    8,1  5368709120     0 198201 /tmp/debug_dump.log (deleted)

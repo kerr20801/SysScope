@@ -1,0 +1,7 @@
+[Wed Oct 28 12:45:10 2026] memory cgroup out of memory: constraint=CONSTRAINT_MEMCG, nodemask=(null), cpuset=docker-1234.scope, mems_allowed=0
+[Wed Oct 28 12:45:10 2026] Memory cgroup out of memory: Killed process 24912 (java) total-vm:2451000kB, anon-rss:1048576kB, file-rss:1200kB
+[Wed Oct 28 12:45:10 2026] oom_reaper: reaped process 24912 (java), now anon-rss:0kB
+
+              total        used        free      shared  buff/cache   available
+Mem:          64120       28500       12000        1200       23620       34420
+Swap:          8192         200        7992

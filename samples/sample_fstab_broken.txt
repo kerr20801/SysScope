@@ -1,0 +1,5 @@
+# /etc/fstab: static file system information.
+UUID=e289c8a1-3019-482a-9812-482910291920 / ext4 defaults 0 1
+UUID=91823019-1294-482a-9812-182930192830 /boot ext4 defaults 0 2
+/dev/sdb1 /data ext4 defaults 0 2
+192.168.1.200:/shared_storage /mnt/nfs_backup nfs defaults 0 0

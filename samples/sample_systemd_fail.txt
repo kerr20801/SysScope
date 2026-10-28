@@ -1,0 +1,10 @@
+UNIT           LOAD   ACTIVE SUB    DESCRIPTION
+nginx.service  loaded failed failed A high performance web server and a reverse proxy server
+docker.service loaded failed failed Docker Application Container Engine
+
+Oct 28 11:52:01 srv01 systemd[1]: Starting A high performance web server...
+Oct 28 11:52:02 srv01 nginx[12891]: nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
+Oct 28 11:52:02 srv01 nginx[12891]: nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
+Oct 28 11:52:03 srv01 systemd[1]: nginx.service: Main process exited, code=exited, status=1/FAILURE
+Oct 28 11:52:03 srv01 systemd[1]: nginx.service: Failed with result 'exit-code'.
+Oct 28 11:52:03 srv01 systemd[1]: Failed to start A high performance web server.

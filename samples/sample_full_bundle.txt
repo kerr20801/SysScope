@@ -1,0 +1,66 @@
+=== [1] HISTORY ===
+ 1001  2026-10-28 11:30:10  uptime
+ 1002  2026-10-28 11:30:15  free -m
+ 1003  2026-10-28 11:31:02  df -h
+ 1004  2026-10-28 11:32:18  cd /var/www/html/api
+ 1005  2026-10-28 11:33:45  git fetch origin
+ 1006  2026-10-28 11:34:00  git pull origin master
+ 1007  2026-10-28 11:35:20  pip install -r requirements.txt
+ 1008  2026-10-28 11:36:50  mysql -u root -pAdminPass@2026 -e "SHOW DATABASES;"
+ 1009  2026-10-28 11:38:10  python3 manage.py migrate
+ 1010  2026-10-28 11:40:05  vim /etc/nginx/sites-available/default
+ 1011  2026-10-28 11:41:20  systemctl reload nginx
+ 1012  2026-10-28 11:42:00  curl -I http://127.0.0.1:80/api/health
+ 1013  2026-10-28 11:43:15  tail -n 50 /var/log/nginx/error.log
+ 1014  2026-10-28 11:45:30  ss -tulpn | grep :80
+ 1015  2026-10-28 11:47:10  rm -rf /var/log/catalina.out
+ 1016  2026-10-28 11:49:00  chmod -R 777 ~/.ssh
+ 1017  2026-10-28 11:51:25  sudo iptables -F
+ 1018  2026-10-28 11:53:40  swapoff -a
+ 1019  2026-10-28 11:55:00  systemctl restart nginx
+ 1020  2026-10-28 11:56:15  systemctl status nginx
+
+=== [2] SYSTEMD ===
+● nginx.service - A high performance web server and a reverse proxy server
+     Loaded: loaded (/lib/systemd/system/nginx.service; enabled; vendor preset: enabled)
+     Active: failed (Result: exit-code) since Wed 2026-10-28 11:52:03 CST; 5min ago
+    Process: 12891 ExecStart=/usr/sbin/nginx -g daemon on; master_process on; (code=exited, status=1/FAILURE)
+   Main PID: 12891 (code=exited, status=1/FAILURE)
+
+Oct 28 11:52:02 srv01 nginx[12891]: nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
+Oct 28 11:52:03 srv01 systemd[1]: nginx.service: Failed with result 'exit-code'.
+Oct 28 11:52:03 srv01 systemd[1]: Failed to start A high performance web server.
+
+=== [3] DISK ===
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda1        50G   50G     0 100% /
+tmpfs           7.8G     0  7.8G   0% /dev/shm
+---
+Filesystem      Inodes  IUsed   IFree IUse% Mounted on
+/dev/sda1      3276800 250000 3026800    8% /
+
+COMMAND   PID USER   FD   TYPE DEVICE   SIZE/OFF   NODE NAME
+java     1821 root    4w   REG    8,1 48291829100 128912 /var/log/catalina.out (deleted)
+nginx    2910 root    7w   REG    8,1   291029100 128913 /var/log/nginx/access.log (deleted)
+
+=== [4] MEM_OOM ===
+[Wed Oct 28 11:58:32 2026] Out of memory: Kill process 18291 (mysqld) score 851 or sacrifice child
+[Wed Oct 28 11:58:32 2026] Killed process 18291 (mysqld) total-vm:482910kB, anon-rss:382910kB, file-rss:0kB
+[Wed Oct 28 11:58:32 2026] oom_reaper: reaped process 18291 (mysqld), now anon-rss:0kB, file-rss:0kB
+
+              total        used        free      shared  buff/cache   available
+Mem:          15820       14910         150         310         760         320
+Swap:          2047        2047           0
+
+=== [5] REBOOT ===
+# /etc/fstab
+UUID=a1b2c3d4-0001 / ext4 errors=remount-ro 0 1
+UUID=a1b2c3d4-0002 /boot ext4 defaults 0 2
+192.168.1.100:/shared/nfs /mnt/nfs nfs defaults 0 0
+/dev/sdb1 /data ext4 defaults 0 2
+
+=== [6] NETWORK ===
+Netid State  Recv-Q Send-Q  Local Address:Port   Peer Address:PortProcess
+tcp   LISTEN 0      128     0.0.0.0:80           0.0.0.0:*       users:(("apache2",pid=1284,fd=4))
+tcp   LISTEN 0      128     127.0.0.1:8080       0.0.0.0:*       users:(("python3",pid=1592,fd=3))
+tcp   LISTEN 0      511     0.0.0.0:22           0.0.0.0:*       users:(("sshd",pid=982,fd=3))

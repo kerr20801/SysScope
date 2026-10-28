@@ -1,0 +1,7 @@
+[Oct28 11:58:32] Out of memory: Kill process 18291 (mysqld) score 851 or sacrifice child
+[Oct28 11:58:32] Killed process 18291 (mysqld) total-vm:482910kB, anon-rss:382910kB, file-rss:0kB
+[Oct28 11:58:32] oom_reaper: reaped process 18291 (mysqld), now anon-rss:0kB, file-rss:0kB
+
+              total        used        free      shared  buff/cache   available
+Mem:          15820       14910         150         310         760         320
+Swap:          2047        2047           0

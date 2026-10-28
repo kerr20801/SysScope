@@ -1,0 +1,12 @@
+● nginx.service - A high performance web server and a reverse proxy server
+     Loaded: loaded (/lib/systemd/system/nginx.service; enabled; vendor preset: enabled)
+     Active: failed (Result: exit-code) since Wed 2026-10-28 11:52:03 CST; 5min ago
+    Process: 12891 ExecStart=/usr/sbin/nginx -g daemon on; master_process on; (code=exited, status=1/FAILURE)
+   Main PID: 12891 (code=exited, status=1/FAILURE)
+        CPU: 12ms
+
+Oct 28 11:52:01 srv01 systemd[1]: Starting A high performance web server...
+Oct 28 11:52:02 srv01 nginx[12891]: nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
+Oct 28 11:52:02 srv01 nginx[12891]: nginx: [emerg] bind() to [::]:80 failed (98: Address already in use)
+Oct 28 11:52:03 srv01 systemd[1]: nginx.service: Failed with result 'exit-code'.
+Oct 28 11:52:03 srv01 systemd[1]: Failed to start A high performance web server.
