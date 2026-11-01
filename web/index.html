@@ -130,6 +130,7 @@ tr:hover{background:rgba(255,255,255,0.02)}
   <button class="tab-btn" id="tabBtnSystemd" onclick="switchTab('systemd')">🚨 服務崩潰捕手 (Systemd CrashLoop)</button>
   <button class="tab-btn" id="tabBtnOOM" onclick="switchTab('oom')">🔪 OOM 殺人案發現場 (OOM Forensic)</button>
   <button class="tab-btn" id="tabBtnReboot" onclick="switchTab('reboot')">💣 重開機安全驗收 (Reboot Readiness)</button>
+  <button class="tab-btn" id="tabBtnCve" onclick="switchTab('cve')">🛡️ CVE 比對 (CVE Audit)</button>
 </div>
 
 <main class="main">
@@ -432,6 +433,34 @@ UUID=a1b2c3d4-0002 /boot ext4 defaults 0 2
     <div id="rebootResults" style="display:none;"></div>
   </div>
 
+  <!-- ==================== TAB 6: CVE 比對 + kernel 白話狀態 ==================== -->
+  <div id="viewCve" style="display:none;">
+    <div class="card" style="border-left:4px solid #38bdf8;background:#0d1525;padding:16px 20px;">
+      <div style="font-size:13px;color:#cbd5e1;line-height:1.65;">
+        <strong style="color:#38bdf8;font-size:14.5px;">💡 這是什麼功能？</strong><br>
+        ① 用白話告訴你：<strong>正在跑哪個 kernel、有沒有「已更新但沒重開機」</strong>（自動化更新最常漏的一件事）。<br>
+        ② 輸入 CVE 編號，回答：<strong>已修復／需更新／需重開機／尚無修補／未安裝</strong>。<br>
+        ③ 比對依據是<strong>發行版公告的修復版本</strong>（不是 kernel 版本號，因為發行版會 backport）。目前支援 Ubuntu / Debian。<br>
+        👉 在目標主機貼上這行收集指令（唯讀），再把輸出貼到下方：
+        <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
+          <button class="btn btn-sm btn-secondary" onclick="copyCveCollector()">📋 複製收集指令（唯讀）</button>
+          <button class="btn btn-sm btn-secondary" onclick="analyzeCve(true)">🖥️ 掃描這台主機（SysScope 所在機器，Linux）</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-hdr"><div><h2>🛡️ 收集結果與 CVE 編號</h2></div></div>
+      <textarea id="cveIds" spellcheck="false" style="width:100%;min-height:70px;margin-bottom:10px;padding:10px;background:#0b1220;color:#e2e8f0;border:1px solid #334155;border-radius:8px;" placeholder="（選填）貼上 CVE 編號、整頁公告文字或新聞內容都可以，工具會自動挑出裡面所有的 CVE 編號（最多比對 30 個）。留空＝自動比對最新公告，不用自己找 CVE。"></textarea>
+      <input id="cveAppVer" spellcheck="false" style="width:100%;margin-bottom:10px;padding:10px;background:#0b1220;color:#e2e8f0;border:1px solid #334155;border-radius:8px;" placeholder="（選填）應用程式版本，例如 LibreNMS 的 26.10.0：用來粗略比對『應用程式層級』的 CVE（非 apt 套件）">
+      <textarea id="cveInput" spellcheck="false" placeholder="貼上收集指令的輸出（含 === [CVE_OS] === 等區塊）……"></textarea>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="analyzeCve(false)">⚡ 開始比對</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('cveInput').value=''">🗑️ 清空</button>
+      </div>
+    </div>
+    <div id="cveResults" style="display:none;"></div>
+  </div>
+
 </main>
 
 <script>
@@ -445,7 +474,8 @@ function switchTab(tab) {
     'disk':     { btn: 'tabBtnDisk',     view: 'viewDisk' },
     'systemd':  { btn: 'tabBtnSystemd',  view: 'viewSystemd' },
     'oom':      { btn: 'tabBtnOOM',      view: 'viewOOM' },
-    'reboot':   { btn: 'tabBtnReboot',   view: 'viewReboot' }
+    'reboot':   { btn: 'tabBtnReboot',   view: 'viewReboot' },
+    'cve':      { btn: 'tabBtnCve',      view: 'viewCve' }
   };
   Object.keys(tabMap).forEach(t => {
     const item = tabMap[t];
@@ -1319,6 +1349,116 @@ function renderRebootDetails(data) {
       </table>
     </div>
   `;
+}
+
+// ----------------------------------------------------------------------------
+// CVE 比對
+// ----------------------------------------------------------------------------
+async function copyCveCollector() {
+  try {
+    const res = await fetch('/api/cve/collector');
+    const data = await res.json();
+    copySnippet(data.command);
+  } catch(e) { showToast('取得收集指令失敗: ' + e.message); }
+}
+
+async function analyzeCve(live) {
+  const text = document.getElementById('cveInput').value.trim();
+  const cves = document.getElementById('cveIds').value.trim();
+  if (!live && !text) { showToast('請先貼上收集結果，或按「掃描這台主機」'); return; }
+  try {
+    const res = await fetch('/api/diagnose/cve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text, cves: cves, live: !!live, app_version: document.getElementById('cveAppVer').value.trim() })
+    });
+    const data = await res.json();
+    if (data.success === false) { showToast(data.error || '比對失敗'); return; }
+    renderVerdictAndDetails('cveResults', data, renderCveDetails(data));
+  } catch(e) { showToast('CVE 比對失敗: ' + e.message); }
+}
+
+const CVE_LABEL = {
+  UPDATE_NEEDED: ['需更新套件', 'badge-crit'], NO_FIX_YET: ['公告尚無修復版本', 'badge-warn'],
+  REBOOT_NEEDED: ['需重開機才生效', 'badge-warn'], FIXED: ['已修復', 'badge-ok'],
+  NOT_INSTALLED: ['未安裝，不受影響', 'badge-ok'], UNKNOWN: ['查無資料（不等於安全）', 'badge-warn'],
+  UNSUPPORTED: ['尚未支援此發行版', 'badge-warn'],
+  APP_LIKELY_AFFECTED: ['應用程式：看起來未修補（推斷）', 'badge-crit'], APP_LIKELY_FIXED: ['應用程式：看起來已修復（推斷）', 'badge-ok'],
+  APP_MANUAL: ['應用程式層級：請看公告', 'badge-warn']
+};
+
+function renderCveDetails(data) {
+  const k = data.kernel || {};
+  const days = (k.reboot_pending_days !== null && k.reboot_pending_days !== undefined) ? `，已等待 ${k.reboot_pending_days} 天` : '';
+  const kernelCard = `
+    <div class="card">
+      <div class="card-hdr"><h2>🧬 Kernel 白話狀態</h2></div>
+      <table><tbody>
+        <tr><td>正在跑的 kernel</td><td><code>${escapeHtml(k.running)}</code>（套件版本 ${escapeHtml(k.running_version || '?')}）</td></tr>
+        <tr><td>已安裝的最新 kernel</td><td><code>${escapeHtml(k.newest_installed || '?')}</code>（${escapeHtml(k.newest_installed_version || '?')}）</td></tr>
+        <tr><td>待重開機</td><td>${k.reboot_pending
+          ? `<span class="badge badge-crit">是</span> ${k.behind_installed ? '已安裝較新 kernel 但還沒用上；' : ''}${k.reboot_flag ? '系統要求重開機' + (k.reboot_packages && k.reboot_packages.length ? '（' + escapeHtml(k.reboot_packages.join('、')) + '）' : '') : ''}${days}`
+          : '<span class="badge badge-ok">否</span>'}</td></tr>
+        <tr><td>已連續開機</td><td>${k.uptime_days !== null && k.uptime_days !== undefined ? k.uptime_days + ' 天' : '—'}</td></tr>
+        <tr><td>待安裝的安全更新</td><td>${(data.pending_security_updates || []).length} 個（全部待更新 ${data.pending_updates_total || 0} 個）</td></tr>
+      </tbody></table>
+    </div>`;
+  const af = (data.auto_fixes && data.auto_fixes.items) || [];
+  const autoCard = af.length === 0 ? '' : `
+    <div class="card">
+      <div class="card-hdr"><h2>🔄 待更新的套件，更新後會修掉的 CVE（自動比對最新公告，共 ${data.auto_fixes.total_cves} 個）</h2></div>
+      <table>
+        <thead><tr><th>類型</th><th>套件</th><th>版本</th><th>會修掉的 CVE</th></tr></thead>
+        <tbody>
+          ${af.map(it => `<tr><td><span class="badge ${it.security ? 'badge-crit' : 'badge-warn'}">${it.security ? '安全' : '一般'}</span></td>
+            <td><code>${escapeHtml(it.source)}</code></td><td>${escapeHtml(it.installed)} → ${escapeHtml(it.candidate)}</td>
+            <td>${it.cves.length ? it.cves.slice(0, 8).map(escapeHtml).join('、') + (it.cves.length > 8 ? ' …等 ' + it.cves.length + ' 個' : '') : '（公告中沒有對應的 CVE）'}</td></tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  const ci = data.cve_input || {};
+  const ciNote = !ci.had_input ? '' : `<div class="card" style="color:#cbd5e1;">🔎 ${ci.found
+    ? `從你貼的內容找到 <strong>${ci.found}</strong> 個 CVE${ci.truncated ? '，只比對前 ' + ci.limit + ' 個' : ''}`
+    : '<span style="color:#fbbf24;">你貼的內容裡沒有找到 CVE 編號（格式應為 CVE-2024-1234）</span>'}</div>`;
+  const cves = data.cves || [];
+  const cveCard = cves.length === 0 ? '' : `
+    <div class="card">
+      <div class="card-hdr"><h2>🛡️ CVE 比對結果（${cves.length} 筆）</h2></div>
+      <table>
+        <thead><tr><th>CVE</th><th>結果</th><th>細節</th></tr></thead>
+        <tbody>
+          ${cves.map(c => {
+            const l = CVE_LABEL[c.verdict] || [c.verdict, 'badge-warn'];
+            const ds = (c.details || []).filter(d => d.state !== 'NOT_INSTALLED').map(d =>
+              `套件 <code>${escapeHtml(d.package)}</code>` +
+              (d.running_version ? `，正在跑 ${escapeHtml(d.running_version)}` : '') +
+              (d.installed_version ? `，已安裝 ${escapeHtml(d.installed_version)}` : '') +
+              (d.newest_installed_version && d.newest_installed_version !== d.running_version ? `，已裝最新 ${escapeHtml(d.newest_installed_version)}` : '') +
+              (d.fixed_version ? `，修復版本 <code>${escapeHtml(d.fixed_version)}</code>` : '')).join('<br>');
+            const app = (c.verdict || '').startsWith('APP_') ? `${c.compare ? escapeHtml(c.compare) + '<br>' : ''}<small>${escapeHtml(c.summary || '')}（發布 ${escapeHtml(c.published || '?')}）</small>` : '';
+            return `<tr>
+              <td><code>${escapeHtml(c.cve)}</code>${c.priority ? `<br><small>優先度：${escapeHtml(c.priority)}</small>` : ''}</td>
+              <td><span class="badge ${l[1]}">${l[0]}</span></td>
+              <td>${ds || ''}${app}${c.note ? '<br>' + escapeHtml(c.note) : ''}${c.verdict === 'NO_FIX_YET' && c.info_url ? `<br><small>公告：${escapeHtml(c.info_url)}</small>` : ''}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  const errs = (data.errors || []).length ? `<div class="card" style="color:#fbbf24;">⚠️ ${data.errors.map(escapeHtml).join('<br>')}</div>` : '';
+  const rx = data.prescription || [];
+  const rxCard = `
+    <div class="card">
+      <div class="card-hdr"><h2>📝 處方籤</h2></div>
+      <table>
+        <thead><tr><th>優先</th><th>步驟</th><th>指令</th><th>為什麼</th></tr></thead>
+        <tbody>
+          ${rx.map(s => `<tr><td><span class="badge ${s.level === 'P1' ? 'badge-crit' : (s.level === 'OK' ? 'badge-ok' : 'badge-warn')}">${escapeHtml(s.level)}</span></td>
+            <td><strong>${escapeHtml(s.title)}</strong></td><td><code>${escapeHtml(s.cmd)}</code></td><td>${escapeHtml(s.why)}</td></tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  return kernelCard + autoCard + ciNote + cveCard + errs + rxCard;
 }
 
 // ----------------------------------------------------------------------------
