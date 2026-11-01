@@ -9,6 +9,7 @@
 [![CVE Engine](https://img.shields.io/badge/CVE%20Audit-dpkg%20%2B%20Google%20OSV.dev-purple.svg)]()
 [![Privacy](https://img.shields.io/badge/Security-Zero--Disk--Retention%20%7C%20Air--Gapped-orange.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Tests](https://img.shields.io/badge/Unit%20Tests-64%20PASS-brightgreen.svg)]()
 
 **專為系統管理員、SRE、資安調查官與機房駐點工程師打造的 L7/OS 現場全方位排障神器！**  
 **100% 地端離線運算 ｜ 純標準庫零依賴 ｜ 幽靈空間秒級釋放 ｜ 人為翻車鑑識 ｜ Cisco 全景大會診 ｜ OSV 官方 CVE 比對**
@@ -75,6 +76,7 @@ Linux 上的應用千百種（Nginx、ELK、PostgreSQL、MariaDB、Redis、Docke
 | **重開機安全雷達 (fstab)** | ❌ 容易疏漏，重啟死機才發現 | ⚠️ 需手動貼出 fstab 詢問 | ❌ 普遍不審計掛載參數容錯 | 💣 **抓出缺 `_netdev,nofail` 的開機地雷** |
 | **發行版 CVE 比對 (Backport)** | 🐢 人工比對 USN/Debian 安全公告 | ❌ upstream 版本號比對頻頻誤報 | ⚠️ 需昂貴漏洞掃描模組授權 | 🛡️ **dpkg 演算法對齊 OSV.dev，驗證重啟狀態** |
 | **全景大會診輸出** | ❌ 跨視窗碎片化截圖 | ⏳ 需等待幾十秒串流回覆 | ⚠️ 儀表板圖表分散 | 👑 **Cisco show tech-support 風格一鍵彙整** |
+| **現場除錯與主動自愈執行** | ❌ 需手動敲指令、易打錯手抖 | ❌ 僅出嘴巴，無本機/遠端執行通道 | ❌ 僅唯讀監控，無自愈閉環 | ⚡ **雙模執行 (本機/SSH)、安全守衛阻斷高危、一鍵自動除錯自愈** |
 
 ---
 
@@ -200,6 +202,14 @@ SysScope 借鏡 Cisco 網路權威的 **`show tech-support`** 理念，推出**�
   * 精準白話判定：`已修復`、`需更新套件`、`需重開機才生效`、`尚無修復版本`。
   * 支援獨立 CLI 指令：`python3 cve_check.py --cve CVE-2024-1086`，亦可製作離線資料包 (`build-pack`) 供氣隙環境使用。
 
+### 模組 8：⚡ 現場除錯指令執行與主動自愈引擎 (Live Remedy & Auto-Healing Engine)
+* **痛點**：「檢查出問題了，但現場工程師不敢動手，或者敲錯指令二次翻車！」
+* **技術亮點**：
+  * **雙模執行引擎 (`remedy_executor.py`)**：支援本地本機 Subprocess 執行，以及遠端 SSH (Paramiko) 執行通道，自動處理 `sudo` 提權密碼管道注入。
+  * **安全防護閘門 (Safe Guardrail)**：硬性攔截自殺性破壞指令（`rm -rf /`、`mkfs`、`dd of=/dev/`、Fork Bomb、`shutdown` 等），嚴守生產安全底線。
+  * **一鍵自動修復全部處方 (One-Click Auto Remediation)**：在全景大會診中點擊按鈕，自動依優先級依序在目標主機下達除錯與止血指令，毫秒級即時反饋 Exit Code、執行時間與輸出，達成「診斷 ➔ 處方 ➔ 下達 ➔ 驗收」的完整 AIOps 自愈閉環！
+  * **遠端一鍵 SSH 全景會診**：在前端直接填入目標主機 IP/帳密，一鍵完成遠端採集、自動剖析與即時除錯。
+
 ---
 
 ## 🛡️ 企業資安與無損設計原則 (Non-Invasive Principles)
@@ -268,6 +278,7 @@ python3 cve_check.py --pack pack.json --offline --cve CVE-2024-1086
 ```text
 SysScope/
   ├── core/
+  │    ├── remedy_executor.py    # 現場除錯與主動自愈執行器 (本機/SSH 雙模、安全守衛、Sudo 提權)
   │    ├── master_synthesizer.py # Cisco 全景大會診核心與因果鏈推演引擎
   │    ├── history_forensic.py   # 指令歷史與人為翻車鑑識模組 (30+ 致命規則)
   │    ├── disk_doctor.py        # 磁碟空間與幽靈日誌急救站 (lsof +L1 剖析)
