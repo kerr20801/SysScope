@@ -158,6 +158,34 @@ tr:hover{background:rgba(255,255,255,0.02)}
       </div>
     </div>
 
+    <!-- 遠端 SSH 連線與排障目標面板 -->
+    <div class="card" style="border:1.5px solid #0284c7;background:#0c182c;padding:14px 18px;margin-bottom:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:20px;">🌐</span>
+          <div>
+            <strong style="color:#38bdf8;font-size:13.5px;">遠端 SSH 主機全景採集與現場下達除錯指令 (Remote Execution Target)</strong>
+            <div style="font-size:11.5px;color:#94a3b8;">直接連線遠端伺服器，一鍵採集 6 大生命線並即時在遠端下達除錯修復指令（支援 Sudo 提權）</div>
+          </div>
+        </div>
+        <div id="targetStatusBadge" class="pill" style="border-color:#334155;color:#cbd5e1;padding:6px 14px;">
+          目前除錯目標：<strong id="targetStatusText" style="color:#38bdf8;">本地本機 (Localhost)</strong>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center;">
+        <input type="text" id="sshHost" class="sinput" placeholder="主機 IP (例: 192.168.1.100)" style="width:170px;" value="">
+        <input type="text" id="sshUser" class="sinput" placeholder="SSH 帳號 (例: root)" style="width:130px;" value="">
+        <input type="password" id="sshPass" class="sinput" placeholder="密碼 / sudo 密碼" style="width:150px;" value="">
+        <input type="number" id="sshPort" class="sinput" placeholder="Port" style="width:65px;" value="22">
+        <button class="btn btn-primary" id="btnRemoteScan" style="background:#0284c7;" onclick="remoteScanHost()">
+          ⚡ 遠端 SSH 一鍵全景會診
+        </button>
+        <button class="btn btn-secondary" onclick="resetToLocal()">
+          🔄 切回本機模式
+        </button>
+      </div>
+    </div>
+
     <div class="card">
       <div class="card-hdr">
         <div>
@@ -824,11 +852,18 @@ function renderMasterPanorama(data) {
   if (worklist.length > 0) {
     html += `
       <div class="card" style="border-left:5px solid #10b981;background:#0d1c24;">
-        <div class="card-hdr">
-          <h2 style="color:#34d399;">📋 現場急診優先級處方籤 (Prioritized Worklist - ${worklist.length} 項行動)</h2>
-          <p>已按事故致死程度智能排序，現場工程師直接依序點擊複製指令執行即可立即止血！</p>
+        <div class="card-hdr" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+          <div>
+            <h2 style="color:#34d399;">📋 現場急診優先級處方籤 (Prioritized Worklist - ${worklist.length} 項行動)</h2>
+            <p>已按事故致死程度智能排序，現場工程師可點擊「⚡ 立即執行除錯」或點「⚡ 一鍵自動修復全部」！</p>
+          </div>
+          <div>
+            <button class="btn btn-primary" id="btnExecAllWorklist" style="background:#dc2626;padding:8px 16px;font-size:12px;" onclick="executeAllWorklist(this)">
+              ⚡ 一鍵自動修復全部處方
+            </button>
+          </div>
         </div>
-        ${worklist.map(w => {
+        ${worklist.map((w, wIdx) => {
           const isP1 = w.priority.includes('P1');
           return `
             <div style="background:rgba(0,0,0,0.35);border:1px solid #1e293b;border-radius:8px;padding:14px;margin-bottom:10px;">
@@ -838,16 +873,30 @@ function renderMasterPanorama(data) {
               </div>
               ${(w.commands && w.commands.length > 0) ? `
                 <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px;">
-                  ${w.commands.map(cmd => `
-                    <div style="display:flex;align-items:center;justify-content:space-between;background:#070b14;border:1px solid #1e293b;padding:6px 10px;border-radius:6px;gap:8px;">
-                      <code style="color:#38bdf8;font-size:12px;word-break:break-all;">${escapeHtml(cmd)}</code>
-                      ${!cmd.startsWith('#') ? `
-                        <button class="btn btn-sm btn-secondary" style="white-space:nowrap;" onclick="copySnippet('${escapeQuote(cmd)}')">
-                          📋 複製指令
-                        </button>
-                      ` : ''}
-                    </div>
-                  `).join('')}
+                  ${w.commands.map((cmd, cIdx) => {
+                    const isExecutable = !cmd.startsWith('#');
+                    const rowId = `remedy-wl-${wIdx}-${cIdx}`;
+                    return `
+                      <div id="${rowId}" class="remedy-command-row" data-cmd="${escapeHtml(cmd)}" style="display:flex;flex-direction:column;background:#070b14;border:1px solid #1e293b;padding:8px 12px;border-radius:6px;gap:6px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+                          <code style="color:#38bdf8;font-size:12px;word-break:break-all;">${escapeHtml(cmd)}</code>
+                          ${isExecutable ? `
+                            <div style="display:flex;gap:6px;align-items:center;">
+                              <button class="btn btn-sm btn-secondary" style="white-space:nowrap;" onclick="copySnippet('${escapeQuote(cmd)}')">
+                                📋 複製
+                              </button>
+                              <button class="btn btn-sm btn-primary btn-exec-single" style="white-space:nowrap;background:#dc2626;" onclick="executeRemedy('${escapeQuote(cmd)}', this, '${rowId}')">
+                                ⚡ 立即執行除錯
+                              </button>
+                            </div>
+                          ` : `
+                            <span style="font-size:11px;color:#64748b;">(手動指引/無需自動執行)</span>
+                          `}
+                        </div>
+                        <div class="exec-output-box" style="display:none;margin-top:4px;padding:8px 10px;border-radius:4px;font-family:'Fira Code',Consolas,monospace;font-size:11.5px;line-height:1.45;white-space:pre-wrap;word-break:break-all;"></div>
+                      </div>
+                    `;
+                  }).join('')}
                 </div>
               ` : ''}
             </div>
@@ -1079,19 +1128,27 @@ function renderDiskDetails(data) {
             </tr>
           </thead>
           <tbody>
-            ${ghosts.map(g => `
-              <tr>
+            ${ghosts.map((g, gIdx) => {
+              const rowId = `remedy-ghost-${gIdx}`;
+              return `
+              <tr id="${rowId}">
                 <td><strong style="color:#38bdf8;">${g.command}</strong></td>
                 <td><code>${g.pid}</code></td>
                 <td><strong style="color:#ef4444;">${g.size_mb} MB</strong></td>
                 <td style="color:#cbd5e1;"><code>${escapeHtml(g.path)}</code></td>
                 <td>
-                  <button class="btn btn-sm btn-primary" onclick="copySnippet('${escapeQuote(g.remedy_cmd)}')">
-                    ⚡ 複製清空指令: <code>${escapeHtml(g.remedy_cmd)}</code>
-                  </button>
+                  <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                    <button class="btn btn-sm btn-secondary" onclick="copySnippet('${escapeQuote(g.remedy_cmd)}')">
+                      📋 複製指令
+                    </button>
+                    <button class="btn btn-sm btn-primary btn-exec-single" style="background:#dc2626;" onclick="executeRemedy('${escapeQuote(g.remedy_cmd)}', this, '${rowId}')">
+                      ⚡ 立即釋放幽靈空間
+                    </button>
+                  </div>
+                  <div class="exec-output-box" style="display:none;margin-top:6px;padding:6px 10px;border-radius:4px;font-family:'Fira Code',Consolas,monospace;font-size:11.5px;line-height:1.4;white-space:pre-wrap;word-break:break-all;"></div>
                 </td>
               </tr>
-            `).join('')}
+            `;}).join('')}
           </tbody>
         </table>
       </div>
@@ -1134,12 +1191,21 @@ function renderSystemdDetails(data) {
           <h2 style="color:#34d399;">⚡ 現場立即除錯與修復指令包</h2>
           <p>依據死因自動精確生成，點擊即可複製至 Linux 終端機執行</p>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">
-          ${remedyCmds.map(cmd => `
-            <button class="btn btn-primary" style="background:#047857;" onclick="copySnippet('${escapeQuote(cmd)}')">
-              📋 複製：<code>${escapeHtml(cmd)}</code>
-            </button>
-          `).join('')}
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
+          ${remedyCmds.map((cmd, sIdx) => {
+            const rowId = `remedy-sysd-${sIdx}`;
+            return `
+            <div id="${rowId}" style="display:flex;flex-direction:column;background:#070b14;border:1px solid #1e293b;padding:8px 12px;border-radius:6px;gap:6px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+                <code style="color:#38bdf8;">${escapeHtml(cmd)}</code>
+                <div style="display:flex;gap:6px;align-items:center;">
+                  <button class="btn btn-sm btn-secondary" onclick="copySnippet('${escapeQuote(cmd)}')">📋 複製</button>
+                  <button class="btn btn-sm btn-primary btn-exec-single" style="background:#dc2626;" onclick="executeRemedy('${escapeQuote(cmd)}', this, '${rowId}')">⚡ 立即重啟/修復</button>
+                </div>
+              </div>
+              <div class="exec-output-box" style="display:none;margin-top:4px;padding:8px 10px;border-radius:4px;font-family:'Fira Code',Consolas,monospace;font-size:11.5px;line-height:1.45;white-space:pre-wrap;word-break:break-all;"></div>
+            </div>
+          `;}).join('')}
         </div>
       </div>
     `;
@@ -1521,6 +1587,166 @@ async function initSysInfo() {
 }
 
 window.addEventListener('DOMContentLoaded', initSysInfo);
+
+// ----------------------------------------------------------------------------
+// 現場除錯與處方指令執行引擎 (Live Remedy Execution Engine)
+// ----------------------------------------------------------------------------
+async function executeRemedy(cmd, btnElem, rowId) {
+  if (!cmd || !cmd.trim()) return;
+  const originalText = btnElem.innerText;
+  btnElem.disabled = true;
+  btnElem.innerText = '⏳ 執行中...';
+
+  const host = (document.getElementById('sshHost') ? document.getElementById('sshHost').value.trim() : '');
+  const user = (document.getElementById('sshUser') ? document.getElementById('sshUser').value.trim() : '');
+  const password = (document.getElementById('sshPass') ? document.getElementById('sshPass').value : '');
+  const port = parseInt(document.getElementById('sshPort') ? document.getElementById('sshPort').value : '22', 10) || 22;
+
+  let row = null;
+  if (rowId) row = document.getElementById(rowId);
+  if (!row && btnElem) row = btnElem.closest('.remedy-command-row') || btnElem.closest('tr') || btnElem.parentElement;
+  let outBox = row ? row.querySelector('.exec-output-box') : null;
+
+  try {
+    const res = await fetch('/api/exec-remedy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ command: cmd, host, user, password, port })
+    });
+    const data = await res.json();
+
+    if (outBox) {
+      outBox.style.display = 'block';
+      if (data.target === 'blocked') {
+        outBox.style.background = 'rgba(239,68,68,0.2)';
+        outBox.style.border = '1px solid #ef4444';
+        outBox.style.color = '#fca5a5';
+        outBox.innerText = `🛡️ [安全防護閥攔截]\n${data.stderr || '該指令已被 SysScope 系統安全守衛硬性阻斷！'}`;
+      } else if (data.success && data.exit_code === 0) {
+        outBox.style.background = 'rgba(16,185,129,0.12)';
+        outBox.style.border = '1px solid #10b981';
+        outBox.style.color = '#86efac';
+        outBox.innerText = `✅ [執行成功] Exit Code: 0 (${data.execution_time_ms}ms) | 目標: ${data.target}\n${data.stdout || '(指令執行完畢，無額外輸出)'}`;
+      } else {
+        outBox.style.background = 'rgba(239,68,68,0.15)';
+        outBox.style.border = '1px solid #ef4444';
+        outBox.style.color = '#fca5a5';
+        outBox.innerText = `❌ [執行失敗] Exit Code: ${data.exit_code} (${data.execution_time_ms}ms) | 目標: ${data.target}\n` +
+                           (data.stderr ? `[STDERR]:\n${data.stderr}\n` : '') +
+                           (data.stdout ? `[STDOUT]:\n${data.stdout}` : '');
+      }
+    }
+
+    if (data.success && data.exit_code === 0) {
+      btnElem.innerText = '✔ 已成功執行';
+      btnElem.style.background = '#059669';
+      showToast('除錯指令執行成功！(Exit 0)');
+    } else {
+      btnElem.innerText = '⚠️ 執行有異常';
+      btnElem.style.background = '#b91c1c';
+      showToast('指令執行完畢，返回碼非 0 或連線異常');
+    }
+  } catch (err) {
+    if (outBox) {
+      outBox.style.display = 'block';
+      outBox.style.background = 'rgba(239,68,68,0.2)';
+      outBox.style.border = '1px solid #ef4444';
+      outBox.style.color = '#fca5a5';
+      outBox.innerText = `❌ [前端請求異常]: ${err.message}`;
+    }
+    btnElem.innerText = '❌ 連線錯誤';
+    showToast('發送指令失敗: ' + err.message);
+  } finally {
+    btnElem.disabled = false;
+  }
+}
+
+async function executeAllWorklist(mainBtn) {
+  const btns = Array.from(document.querySelectorAll('#panoramaResults .btn-exec-single'));
+  if (btns.length === 0) {
+    showToast('處方籤中沒有可執行的指令！');
+    return;
+  }
+  if (!confirm(`確定要依序自動執行處方籤中的 ${btns.length} 項除錯指令嗎？`)) {
+    return;
+  }
+
+  const originalText = mainBtn ? mainBtn.innerText : '';
+  if (mainBtn) {
+    mainBtn.disabled = true;
+  }
+
+  let successCount = 0;
+  for (let i = 0; i < btns.length; i++) {
+    const btn = btns[i];
+    if (mainBtn) mainBtn.innerText = `⏳ 正在執行除錯 (${i + 1}/${btns.length})...`;
+    btn.click();
+    await new Promise(r => setTimeout(r, 600));
+  }
+
+  if (mainBtn) {
+    mainBtn.disabled = false;
+    mainBtn.innerText = '✔ 全部處方已下達完畢';
+    mainBtn.style.background = '#059669';
+  }
+  showToast('全部處方已下達完畢！建議再次點擊「全景會診」驗收復原狀態。');
+}
+
+async function remoteScanHost() {
+  const host = document.getElementById('sshHost').value.trim();
+  const user = document.getElementById('sshUser').value.trim() || '';
+  const password = document.getElementById('sshPass').value;
+  const port = parseInt(document.getElementById('sshPort').value, 10) || 22;
+
+  if (!host) {
+    showToast('請先輸入遠端主機 IP！');
+    return;
+  }
+
+  const btn = document.getElementById('btnRemoteScan');
+  btn.disabled = true;
+  btn.innerText = '⏳ 遠端採集中...';
+  showToast(`正在連線 ${user}@${host}:${port} 採集全景資料...`);
+
+  try {
+    const res = await fetch('/api/remote-scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ host, user, password, port })
+    });
+    const data = await res.json();
+    if (!data.success) {
+      showToast('遠端採集失敗: ' + (data.error || '未知錯誤'));
+      btn.innerText = '⚡ 遠端 SSH 一鍵全景會診';
+      btn.disabled = false;
+      return;
+    }
+
+    document.getElementById('bundleInput').value = data.bundle_raw || '';
+    document.getElementById('targetStatusText').innerText = `遠端: ${data.target}`;
+    document.getElementById('targetStatusText').style.color = '#10b981';
+    switchTab('panorama');
+    renderMasterPanorama(data.synthesis);
+    showToast(`遠端全景會診完成！目標: ${data.target}`);
+  } catch (err) {
+    showToast('遠端採集請求異常: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerText = '⚡ 遠端 SSH 一鍵全景會診';
+  }
+}
+
+async function resetToLocal() {
+  try {
+    await fetch('/api/target-reset', { method: 'POST' });
+    document.getElementById('targetStatusText').innerText = '本地本機 (Localhost)';
+    document.getElementById('targetStatusText').style.color = '#38bdf8';
+    showToast('已切換回本地本機模式');
+  } catch(e) {
+    showToast('切換本機模式失敗');
+  }
+}
+
 </script>
 </body>
 </html>

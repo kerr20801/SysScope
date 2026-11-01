@@ -30,10 +30,17 @@ from core.oom_forensic import OOMForensic
 from core.reboot_readiness import RebootReadiness
 from core.net_kernel_audit import NetKernelAudit
 from core.master_synthesizer import MasterSynthesizer
+from core.remedy_executor import remedy_executor
 import core.cve_audit as cve_audit_mod
 from core.cve_audit import CVEAudit, COLLECTOR_ONELINER, collect_local, load_pack
 
 PORT = 8940
+for i, arg in enumerate(sys.argv):
+    if arg == "--port" and i + 1 < len(sys.argv):
+        try:
+            PORT = int(sys.argv[i + 1])
+        except ValueError:
+            pass
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 WEB_DIR = os.path.join(BASE_DIR, "web")
 INDEX_PATH = os.path.join(WEB_DIR, "index.html")
@@ -89,6 +96,9 @@ class SysScopeHandler(BaseHTTPRequestHandler):
                 "python_version": sys.version.split()[0],
                 "time": time.strftime("%Y-%m-%d %H:%M:%S")
             })
+
+        elif path == "/api/target-status":
+            self._send_json({"success": True, "target": remedy_executor.get_cached_target()})
 
         elif path == "/api/sample":
             qs = urllib.parse.parse_qs(parsed.query)
@@ -196,6 +206,50 @@ class SysScopeHandler(BaseHTTPRequestHandler):
             # 本機一鍵自動掃描 (在 Linux / Mac / Windows 伺服器直接執行)
             res = self._run_host_live_scan()
             self._send_json(res)
+
+        elif path == "/api/exec-remedy":
+            cmd = body.get("command", "")
+            host = body.get("host")
+            user = body.get("user")
+            password = body.get("password")
+            port = int(body.get("port", 22)) if body.get("port") else 22
+            res = remedy_executor.execute(cmd, host=host, user=user, password=password, port=port)
+            self._send_json(res)
+
+        elif path == "/api/target-reset":
+            remedy_executor.set_cached_target(None, "", None, 22)
+            self._send_json({"success": True, "target": remedy_executor.get_cached_target()})
+
+        elif path == "/api/remote-scan":
+            host = body.get("host", "").strip()
+            user = body.get("user", "").strip()
+            password = body.get("password", "")
+            port = int(body.get("port", 22)) if body.get("port") else 22
+            if not host:
+                self._send_json({"success": False, "error": "請提供目標主機 IP / Hostname！"}, 400)
+                return
+            remedy_executor.set_cached_target(host, user, password, port)
+            collector_cmd = (
+                '(echo "=== [1] HISTORY ==="; HISTTIMEFORMAT="%F %T " history 300 2>/dev/null || cat ~/.bash_history 2>/dev/null | tail -n 300; '
+                'echo "=== [2] SYSTEMD ==="; systemctl --failed --no-pager 2>/dev/null; journalctl -p 3 -xb -n 30 --no-pager 2>/dev/null; '
+                'echo "=== [3] DISK ==="; df -h; echo "---"; df -i; lsof +L1 2>/dev/null | grep deleted | head -n 30; '
+                'echo "=== [4] MEM_OOM ==="; free -m; dmesg -T 2>/dev/null | grep -Ei "oom|killed process|out of memory" | tail -n 50; '
+                'echo "=== [5] REBOOT ==="; cat /etc/fstab 2>/dev/null; cat /proc/mounts 2>/dev/null; '
+                'echo "=== [6] NETWORK ==="; ss -tulpn 2>/dev/null)'
+            )
+            exec_res = remedy_executor.execute(collector_cmd, host=host, user=user, password=password, port=port, timeout=15)
+            if not exec_res["success"] and not exec_res["stdout"]:
+                self._send_json({"success": False, "error": f"遠端連線或採集失敗: {exec_res['stderr']}"}, 500)
+                return
+            bundle_raw = exec_res["stdout"]
+            synthesis = master_synthesizer.synthesize(bundle_raw)
+            self._send_json({
+                "success": True,
+                "is_live": True,
+                "target": f"{user}@{host}:{port}",
+                "bundle_raw": bundle_raw,
+                "synthesis": synthesis
+            })
 
         else:
             self.send_error(404, "Not Found")
