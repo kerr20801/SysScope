@@ -11,9 +11,11 @@ SysScope Server - 系統主機全方位異常透視儀
 5. 重開機安全驗收雷達 (/api/diagnose/reboot)
 6. 核心網路連線與 Port 綁定診斷 (/api/diagnose/network)
 7. 本機全自動一鍵掃描 (/api/auto-scan-host)
+8. CVE 比對與 kernel 白話狀態 (/api/diagnose/cve，/api/cve/collector)
 """
 import sys
 import os
+import re
 import json
 import socket
 import time
@@ -28,6 +30,8 @@ from core.oom_forensic import OOMForensic
 from core.reboot_readiness import RebootReadiness
 from core.net_kernel_audit import NetKernelAudit
 from core.master_synthesizer import MasterSynthesizer
+import core.cve_audit as cve_audit_mod
+from core.cve_audit import CVEAudit, COLLECTOR_ONELINER, collect_local, load_pack
 
 PORT = 8940
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -42,6 +46,9 @@ oom_forensic = OOMForensic()
 reboot_readiness = RebootReadiness()
 net_kernel_audit = NetKernelAudit()
 master_synthesizer = MasterSynthesizer()
+cve_audit = CVEAudit()
+# 離線資料包（可選）：環境變數 SYSSCOPE_CVE_PACK 指向用 `cve_check.py build-pack` 製作的 JSON
+CVE_PACK_PATH = os.environ.get("SYSSCOPE_CVE_PACK", "")
 
 class SysScopeHandler(BaseHTTPRequestHandler):
     def end_headers(self):
@@ -70,6 +77,9 @@ class SysScopeHandler(BaseHTTPRequestHandler):
                     self.wfile.write(f.read())
             else:
                 self.send_error(404, "index.html not found")
+
+        elif path == "/api/cve/collector":
+            self._send_json({"success": True, "command": COLLECTOR_ONELINER})
 
         elif path == "/api/sysinfo":
             self._send_json({
@@ -158,6 +168,28 @@ class SysScopeHandler(BaseHTTPRequestHandler):
             ss_text = body.get("ss_text", "")
             kernel_stats = body.get("kernel_stats", "")
             res = net_kernel_audit.audit(ss_text, kernel_stats=kernel_stats)
+            self._send_json(res)
+
+        elif path == "/api/diagnose/cve":
+            cve_info = cve_audit_mod.parse_cve_input(body.get("cves", ""))
+            cves = cve_info["ids"]
+            text = body.get("text", "")
+            if body.get("live") and sys.platform.startswith("linux"):
+                text = collect_local()
+            if not text.strip():
+                self._send_json({"success": False, "error": "沒有收集資料：請貼上收集指令的輸出，或在 Linux 主機上使用本機掃描。"}, 400)
+                return
+            pack = None
+            try:
+                if CVE_PACK_PATH and os.path.exists(CVE_PACK_PATH):
+                    pack = load_pack(CVE_PACK_PATH)
+            except Exception:
+                pack = None
+            res = cve_audit.audit(text, cves=cves, pack=pack, offline=bool(body.get("offline")),
+                                  app_version=(str(body.get("app_version", "")).strip() or None),
+                                  auto=(not cve_info["had_input"] and not body.get("offline")),
+                                  cve_input=cve_info)
+            res["success"] = True
             self._send_json(res)
 
         elif path == "/api/auto-scan-host":
