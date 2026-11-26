@@ -12,7 +12,7 @@ cd "$DIR"
 echo "==================================================================="
 echo "    ⬡ SysScope — 系統主機全方位異常透視儀 (Master Host Doctor)"
 echo "    機房維運三部曲 L7/OS 篇：人為翻車鑑識 | 幽靈日誌急救 | CrashLoop 捕手"
-echo "    Developed by Kerr & Google Gemini"
+echo "    Developed by SysScope Team"
 echo "==================================================================="
 echo ""
 

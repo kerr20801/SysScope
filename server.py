@@ -15,13 +15,12 @@ SysScope Server - 系統主機全方位異常透視儀
 """
 import sys
 import os
-import re
 import json
 import socket
 import time
 import subprocess
 import urllib.parse
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
 from core.disk_doctor import DiskDoctor
 from core.history_forensic import HistoryForensic
@@ -29,19 +28,21 @@ from core.systemd_catcher import SystemdCatcher
 from core.oom_forensic import OOMForensic
 from core.reboot_readiness import RebootReadiness
 from core.net_kernel_audit import NetKernelAudit
+from core.backdoor_hunter import BackdoorHunter, BACKDOOR_COLLECTOR_ONELINER
 from core.master_synthesizer import MasterSynthesizer
 from core.remedy_executor import remedy_executor
 import core.cve_audit as cve_audit_mod
 from core.cve_audit import CVEAudit, COLLECTOR_ONELINER, collect_local, load_pack
 
-PORT = 8940
+PORT = int(os.environ.get("SYSSCOPE_PORT", "8940"))
+CORS_ALLOW_ORIGIN = os.environ.get("SYSSCOPE_CORS_ORIGIN", "").strip()
 for i, arg in enumerate(sys.argv):
     if arg == "--port" and i + 1 < len(sys.argv):
         try:
             PORT = int(sys.argv[i + 1])
         except ValueError:
             pass
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
 WEB_DIR = os.path.join(BASE_DIR, "web")
 INDEX_PATH = os.path.join(WEB_DIR, "index.html")
 SAMPLES_DIR = os.path.join(BASE_DIR, "samples")
@@ -52,14 +53,22 @@ systemd_catcher = SystemdCatcher()
 oom_forensic = OOMForensic()
 reboot_readiness = RebootReadiness()
 net_kernel_audit = NetKernelAudit()
+backdoor_hunter = BackdoorHunter()
 master_synthesizer = MasterSynthesizer()
 cve_audit = CVEAudit()
+MAX_POST_BYTES = 20 * 1024 * 1024  # 20 MB 安全上限
 # 離線資料包（可選）：環境變數 SYSSCOPE_CVE_PACK 指向用 `cve_check.py build-pack` 製作的 JSON
 CVE_PACK_PATH = os.environ.get("SYSSCOPE_CVE_PACK", "")
 
 class SysScopeHandler(BaseHTTPRequestHandler):
     def end_headers(self):
-        self.send_header('Access-Control-Allow-Origin', '*')
+        origin = (self.headers.get("Origin") or "").strip() if hasattr(self, "headers") and self.headers else ""
+        if CORS_ALLOW_ORIGIN:
+            self.send_header('Access-Control-Allow-Origin', CORS_ALLOW_ORIGIN)
+        elif origin.startswith(("http://localhost", "http://127.0.0.1", "https://localhost", "https://127.0.0.1")):
+            self.send_header('Access-Control-Allow-Origin', origin)
+        else:
+            self.send_header('Access-Control-Allow-Origin', f'http://127.0.0.1:{PORT}')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         # 資安防護：強制禁止任何硬碟快取與資料殘留 (Zero-Disk-Retention)
@@ -87,6 +96,9 @@ class SysScopeHandler(BaseHTTPRequestHandler):
 
         elif path == "/api/cve/collector":
             self._send_json({"success": True, "command": COLLECTOR_ONELINER})
+
+        elif path == "/api/backdoor/collector":
+            self._send_json({"success": True, "command": BACKDOOR_COLLECTOR_ONELINER})
 
         elif path == "/api/sysinfo":
             self._send_json({
@@ -119,7 +131,9 @@ class SysScopeHandler(BaseHTTPRequestHandler):
                 "systemd": "sample_systemd_status.txt",
                 "systemd_status": "sample_systemd_status.txt",
                 "systemd_syntax": "sample_systemd_syntax.txt",
-                "systemd_crashloop": "sample_systemd_crashloop.txt"
+                "systemd_crashloop": "sample_systemd_crashloop.txt",
+                "backdoor": "sample_backdoor_hunt.txt",
+                "hunt": "sample_backdoor_hunt.txt"
             }
             fname = fname_map.get(sample_type, "sample_full_bundle.txt")
             fpath = os.path.join(SAMPLES_DIR, fname)
@@ -136,8 +150,15 @@ class SysScopeHandler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
 
-        length = int(self.headers.get("Content-Length", 0))
-        post_data = self.rfile.read(length)
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+        except (TypeError, ValueError):
+            self._send_json({"success": False, "error": "無效的 Content-Length 標頭"}, 400)
+            return
+        if length < 0 or length > MAX_POST_BYTES:
+            self._send_json({"success": False, "error": f"請求內容超過上限 ({MAX_POST_BYTES // (1024*1024)} MB)"}, 413)
+            return
+        post_data = self.rfile.read(length) if length > 0 else b""
         try:
             body = json.loads(post_data.decode("utf-8")) if post_data else {}
         except Exception:
@@ -178,6 +199,11 @@ class SysScopeHandler(BaseHTTPRequestHandler):
             ss_text = body.get("ss_text", "")
             kernel_stats = body.get("kernel_stats", "")
             res = net_kernel_audit.audit(ss_text, kernel_stats=kernel_stats)
+            self._send_json(res)
+
+        elif path == "/api/diagnose/backdoor":
+            text = body.get("text", "")
+            res = backdoor_hunter.hunt(text)
             self._send_json(res)
 
         elif path == "/api/diagnose/cve":
@@ -235,7 +261,8 @@ class SysScopeHandler(BaseHTTPRequestHandler):
                 'echo "=== [3] DISK ==="; df -h; echo "---"; df -i; lsof +L1 2>/dev/null | grep deleted | head -n 30; '
                 'echo "=== [4] MEM_OOM ==="; free -m; dmesg -T 2>/dev/null | grep -Ei "oom|killed process|out of memory" | tail -n 50; '
                 'echo "=== [5] REBOOT ==="; cat /etc/fstab 2>/dev/null; cat /proc/mounts 2>/dev/null; '
-                'echo "=== [6] NETWORK ==="; ss -tulpn 2>/dev/null)'
+                'echo "=== [6] NETWORK ==="; ss -tulpn 2>/dev/null; '
+                f'{BACKDOOR_COLLECTOR_ONELINER})'
             )
             exec_res = remedy_executor.execute(collector_cmd, host=host, user=user, password=password, port=port, timeout=15)
             if not exec_res["success"] and not exec_res["stdout"]:
@@ -274,6 +301,7 @@ class SysScopeHandler(BaseHTTPRequestHandler):
             fstab_out = run_sh("cat /etc/fstab 2>/dev/null")
             mounts_out = run_sh("cat /proc/mounts 2>/dev/null")
             ss_out = run_sh("ss -tulpn 2>/dev/null")
+            backdoor_out = run_sh(BACKDOOR_COLLECTOR_ONELINER)
 
             bundle_raw = (
                 f"=== [1] HISTORY ===\n{hist_out}\n\n"
@@ -281,7 +309,8 @@ class SysScopeHandler(BaseHTTPRequestHandler):
                 f"=== [3] DISK ===\n{df_out}\n{lsof_out}\n\n"
                 f"=== [4] MEM_OOM ===\n{dmesg_out}\n\n"
                 f"=== [5] REBOOT ===\n{fstab_out}\n---\n{mounts_out}\n\n"
-                f"=== [6] NETWORK ===\n{ss_out}\n"
+                f"=== [6] NETWORK ===\n{ss_out}\n\n"
+                f"{backdoor_out}\n"
             )
             synthesis = master_synthesizer.synthesize(bundle_raw)
             return {
@@ -312,7 +341,7 @@ def run_server():
         except Exception:
             pass
     server_address = ('', PORT)
-    httpd = HTTPServer(server_address, SysScopeHandler)
+    httpd = ThreadingHTTPServer(server_address, SysScopeHandler)
     url = f"http://localhost:{PORT}"
     print("=" * 60)
     print(" ⬡ SysScope - 系統主機全方位異常透視儀 (Master Host Doctor)")

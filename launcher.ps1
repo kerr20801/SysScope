@@ -6,7 +6,7 @@ $Host.UI.RawUI.WindowTitle = "SysScope - 系統主機全方位異常透視儀"
 Write-Host "===================================================================" -ForegroundColor Cyan
 Write-Host "    [SysScope] 系統主機全方位異常透視儀 (Master Host Doctor)" -ForegroundColor Cyan
 Write-Host "    人為翻車鑑識 | 幽靈日誌急救 | CrashLoop 捕手 | OOM 還原" -ForegroundColor Cyan
-Write-Host "    Developed by Kerr & Google Gemini" -ForegroundColor DarkCyan
+Write-Host "    Developed by SysScope Team" -ForegroundColor DarkCyan
 Write-Host "===================================================================" -ForegroundColor Cyan
 Write-Host ""
 

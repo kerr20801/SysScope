@@ -9,7 +9,7 @@
 [![CVE Engine](https://img.shields.io/badge/CVE%20Audit-dpkg%20%2B%20Google%20OSV.dev-purple.svg)]()
 [![Privacy](https://img.shields.io/badge/Security-Zero--Disk--Retention%20%7C%20Air--Gapped-orange.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Unit%20Tests-64%20PASS-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/Unit%20Tests-70%20PASS-brightgreen.svg)]()
 
 **專為系統管理員、SRE、資安調查官與機房駐點工程師打造的 L7/OS 現場全方位排障神器！**  
 **100% 地端離線運算 ｜ 純標準庫零依賴 ｜ 幽靈空間秒級釋放 ｜ 人為翻車鑑識 ｜ Cisco 全景大會診 ｜ OSV 官方 CVE 比對**
@@ -34,7 +34,7 @@ flowchart TD
 
 ### 為什麼不需要為幾千種服務各寫一套外掛？
 Linux 上的應用千百種（Nginx、ELK、PostgreSQL、MariaDB、Redis、Docker、K8s Node、GitLab...）。如果每個軟體都要寫特定剖析器，維運工具將無比龐大且脆弱。  
-**`SysScope` 抓住所有 Linux 服務共用的 7 大生命線**：
+**`SysScope` 抓住所有 Linux 服務共用的 8 大生命線**：
 1. **人為行為線**：85% 故障源自**故障發生前半小時內的人為危險指令** (`history`)。
 2. **儲存生命線**：磁碟滿載 (`df -h 100%`)、Inode 耗盡 (`df -i 100%`)、被刪除卻佔用空間的**幽靈日誌** (`lsof +L1`)。
 3. **行程存活線**：全域 Systemd 崩潰 (`systemctl status` / `systemctl --failed`)、無限重啟 (`CrashLoopBackOff`)、埠位衝突 (`EADDRINUSE`)。
@@ -42,8 +42,9 @@ Linux 上的應用千百種（Nginx、ELK、PostgreSQL、MariaDB、Redis、Docke
 5. **重啟安全性**：開機鎖死急診室 (`/etc/fstab` 遠端掛載遺漏 `_netdev,nofail`、唯讀磁區鎖定)。
 6. **核心監聽線**：通訊埠綁定陷阱 (`127.0.0.1` 內外隔離盲點)、核心連線追蹤表 (`conntrack full`)。
 7. **核心與弱點安全線**：核心更新後未重開機 (`reboot-required`)、發行版 Backport CVE 弱點精確比對。
+8. **後門與植入物獵捕線**：一鍵快篩幽靈 `UID=0` 帳號、SSH 強制指令金鑰、排程/啟動後門、`LD_PRELOAD` Rootkit、挖礦/反彈 Shell/無檔名常駐、高危 SUID 與 Webshell（附新手白話解釋與唯讀確認指令）。
 
-只要守住這 7 大生命線，**無論上層跑的是什麼服務，故障原因皆無所遁形！**
+只要守住這 8 大生命線，**無論上層跑的是什麼服務，故障與入侵跡象皆無所遁形！**
 
 ---
 
@@ -141,13 +142,13 @@ SysScope 借鏡 Cisco 網路權威的 **`show tech-support`** 理念，推出**�
 
 ## 💎 八大核心模組
 
-### 模組 0：👑 Cisco Tech-Support 全景大會診與因果鏈推演 (Master Panorama ⭐ Kerr's Vision)
+### 模組 0：👑 Cisco Tech-Support 全景大會診與因果鏈推演 (Master Panorama ⭐ Core Feature)
 * **主震央裁決**：自動從全機雜訊中，精準抓出最致命的核心故障（如磁碟 100% 爆滿、核心進程遭 OOM 屠宰、NFS 開機死機地雷）。
 * **跨維度連鎖反應因果鏈 (Cross-Context Chains)**：自動串接指令歷史、空間狀態與進程崩潰，還原人為翻車真相。
 * **急診處方籤 (Prioritized Worklist)**：產出 P1 (服務復原) / P1 (空間秒釋) / P2 (預防死機) 具體指令。
 * **一鍵交班通報**：點擊即可複製整齊的 Markdown 事故通報單，直接發送至 LINE / Teams 群組。
 
-### 模組 1：🕵️ 指令歷史與人為翻車鑑識 (History Forensic ⭐ Kerr's Vision)
+### 模組 1：🕵️ 指令歷史與人為翻車鑑識 (History Forensic ⭐ Core Feature)
 * **痛點**：「服務突然掛了，工程師都說『我什麼都沒改』！」
 * **透視**：深度稽核 Bash History / Zsh History 100~1000 筆紀錄。
 * **30+ 種致命與高危指令規則庫**：
@@ -223,7 +224,7 @@ SysScope 借鏡 Cisco 網路權威的 **`show tech-support`** 理念，推出**�
 3. **100% 唯讀安全 (Read-Only / Human-in-the-Loop)**：
    - 系統不主動發送破壞性修復指令，不隨意殺死 Process。
    - 診斷報告提供**透明且可驗證的白話說明與一鍵複製指令**，由現場工程師確認後親手執行。
-4. **確定性工程優先 · 零幻覺斷網神兵 (Deterministic First ⭐ Kerr's Philosophy)**：
+4. **確定性工程優先 · 零幻覺斷網神兵 (Deterministic First ⭐ Core Philosophy)**：
    - **「沒 AI 時這就很好用！」**—— 拒絕把未清洗的雜亂日誌丟給 LLM 瞎猜。全系統優先以確定性因果鏈與領域專家啟發式推演打底，0.01 秒完成 0 幻覺、純 RAM 揮發診斷；AI 是放大器而非地基。
 
 ---
@@ -355,7 +356,7 @@ OK
 
 ## 👨‍💻 作者與貢獻者 (Author & Contributors)
 
-* **Kerr** ([@kerr20801](https://github.com/kerr20801)) — 專案發起與核心架構設計
+* **SysScope Team** — 專案發起與核心架構設計
 * 🤖 **[Google Gemini](https://gemini.google.com)** — AI 結對編程夥伴 (Pair Programming Copilot)
 * 延續 `SwitchScope`、`NetScope`、`AgentScope` 與 `RedScope` 之企業維運工具艦隊，專注解決機房第一線核心痛點。
 

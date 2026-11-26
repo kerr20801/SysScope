@@ -21,6 +21,7 @@ from core.systemd_catcher import SystemdCatcher
 from core.oom_forensic import OOMForensic
 from core.reboot_readiness import RebootReadiness
 from core.net_kernel_audit import NetKernelAudit
+from core.backdoor_hunter import BackdoorHunter
 
 class MasterSynthesizer:
     def __init__(self):
@@ -30,10 +31,11 @@ class MasterSynthesizer:
         self.oom_forensic = OOMForensic()
         self.reboot_readiness = RebootReadiness()
         self.net_kernel_audit = NetKernelAudit()
+        self.backdoor_hunter = BackdoorHunter()
 
     def demux_bundle(self, raw_text: str) -> Dict[str, str]:
         """
-        將一體化日誌自動依標籤或特徵拆解為 6 大區塊
+        將一體化日誌自動依標籤或特徵拆解為 7 大區塊（含後門與植入物獵捕）
         """
         sections = {
             "history": "",
@@ -41,11 +43,12 @@ class MasterSynthesizer:
             "disk": "",
             "oom": "",
             "reboot": "",
-            "network": ""
+            "network": "",
+            "backdoor": ""
         }
 
         # 標籤正則比對 (支援標準 === [X] NAME === 格式)
-        pattern = r"===\s*\[?\d?\]?\s*(HISTORY|HIST|SYSTEMD|SERVICE|DISK|STORAGE|MEM_OOM|OOM|MEM|REBOOT|FSTAB|NETWORK|NET)\s*==="
+        pattern = r"===\s*\[?\d?\]?\s*(HISTORY|HIST|SYSTEMD|SERVICE|DISK|STORAGE|MEM_OOM|OOM|MEM|REBOOT|FSTAB|NETWORK|NET|BACKDOOR|SECURITY|HUNT)\s*==="
         chunks = re.split(pattern, raw_text, flags=re.IGNORECASE)
 
         if len(chunks) > 1:
@@ -66,6 +69,8 @@ class MasterSynthesizer:
                     sections["reboot"] = body
                 elif "NET" in header:
                     sections["network"] = body
+                elif "BACKDOOR" in header or "SECURITY" in header or "HUNT" in header:
+                    sections["backdoor"] = body
 
         else:
             # 若無明確的分段標籤，啟動「智慧特徵自動嗅探 (Smart Content Sniffing)」
@@ -110,6 +115,7 @@ class MasterSynthesizer:
         res_oom = self.oom_forensic.parse_and_diagnose(sec["oom"]) if sec["oom"] else {"success": True, "verdict": {"level": "INFO", "title": "未提供 OOM 核心日誌", "color": "#64748b"}, "oom_events": [], "mem_info": {}}
         res_reboot = self.reboot_readiness.audit(sec["reboot"]) if sec["reboot"] else {"success": True, "verdict": {"level": "INFO", "title": "未提供 fstab 掛載點", "color": "#64748b"}, "hazards": [], "readiness_score": 100}
         res_network = self.net_kernel_audit.audit(sec["network"]) if sec["network"] else {"success": True, "verdict": {"level": "INFO", "title": "未提供網路連線表", "color": "#64748b"}, "localhost_traps": [], "remedies": []}
+        res_backdoor = self.backdoor_hunter.hunt(sec["backdoor"]) if sec["backdoor"] else {"success": True, "verdict": {"level": "INFO", "title": "未提供後門檢體", "color": "#64748b"}, "findings": [], "security_score": 100, "critical_count": 0, "high_count": 0}
 
         # ---------------------------------------------------------------------
         # 跨維度上下文因果關聯推演 (Cross-Context Incident Chain Reaction)
@@ -268,6 +274,28 @@ class MasterSynthesizer:
             })
             health_score -= 5
 
+        # 7. 關聯：後門與惡意植入物獵捕（第 7 維度）
+        bd_findings = res_backdoor.get("findings", [])
+        bd_crit = res_backdoor.get("critical_count", 0)
+        bd_high = res_backdoor.get("high_count", 0)
+        if bd_crit > 0 or bd_high > 0:
+            top_bd = bd_findings[0]
+            incident_chains.insert(0, {
+                "severity": "CRITICAL" if bd_crit > 0 else "HIGH",
+                "title": f"🕵️ 疑似後門 / 植入物告警：共 {len(bd_findings)} 項異常（最嚴重：{top_bd['title']}）",
+                "flow": f"偵測到 {top_bd['category']} ➔ 主機恐遭持久化入侵或未授權控制 ➔ 建議立即隔離核實",
+                "explanation": top_bd["plain_explain"]
+            })
+            prioritized_worklist.insert(0, {
+                "priority": "P0 (資安急診)",
+                "action": f"先查再動：核實疑似後門【{top_bd['category']}】",
+                "commands": [
+                    top_bd["safe_verify_cmd"],
+                    f"# 處置建議：{top_bd['remedy_advice']}"
+                ]
+            })
+            health_score -= 35 if bd_crit > 0 else 18
+
         health_score = max(5, min(100, health_score))
 
         # 綜合大結論 (Executive Summary)
@@ -308,6 +336,7 @@ class MasterSynthesizer:
                 "disk": res_disk,
                 "oom": res_oom,
                 "reboot": res_reboot,
-                "network": res_network
+                "network": res_network,
+                "backdoor": res_backdoor
             }
         }

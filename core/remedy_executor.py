@@ -3,11 +3,11 @@
 SysScope Remedy Executor (現場除錯與主動自愈執行器)
 
 負責接收 SysScope 產出之處方籤與排障指令，具備：
-1. 本機 (Local Subprocess) 與 遠端 (SSH Paramiko / OpenSSH) 雙模執行能力
+1. 本機 (Local Subprocess) 與 遠端 (SSH Paramiko) 雙模執行能力
 2. 高危破壞性指令安全攔截 (Safe-Guardrail)
-3. Sudo 提權密碼自動傳遞
-4. 毫秒級執行計時與標準輸出/錯誤捕獲
-5. 全域連線目標快取 (Sticky Target Cache)
+3. Sudo 提權密碼透過 stdin 安全傳遞（不暴露於指令列與 ps 行程表）
+4. 非阻塞雙通道輪詢（防止大量 stderr 造成 SSH 死鎖）與逾時保護
+5. 全域連線目標快取 (Sticky Target Cache，對外 API 自動遮蔽明文密碼)
 """
 
 import os
@@ -15,7 +15,7 @@ import re
 import sys
 import time
 import subprocess
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 
 try:
     import paramiko
@@ -23,7 +23,7 @@ try:
 except ImportError:
     HAS_PARAMIKO = False
 
-# 全域連線快取
+# 全域連線快取（僅駐留記憶體，不寫入硬碟）
 _CACHED_TARGET: Dict[str, Any] = {
     "host": None,
     "user": "",
@@ -33,13 +33,16 @@ _CACHED_TARGET: Dict[str, Any] = {
 
 # 高危阻斷指令黑名單 (安全防護閥)
 BLOCKED_PATTERNS = [
-    re.compile(r"\brm\s+-[a-zA-Z]*r[a-zA-Z]*f?\s+/(?:\s|$)", re.IGNORECASE), # rm -rf /
-    re.compile(r"\bmkfs(\.\w+)?\b", re.IGNORECASE),                           # mkfs
-    re.compile(r"\bdd\s+[^;&|]*of=/dev/", re.IGNORECASE),                     # dd of=/dev/
-    re.compile(r":\(\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:", re.IGNORECASE),  # fork bomb
-    re.compile(r"\bdrop\s+database\b", re.IGNORECASE),                        # drop database
-    re.compile(r"\b(?:shutdown|poweroff|halt)\b", re.IGNORECASE),             # shutdown
-    re.compile(r">\s*/dev/(?:sd|nvme|hd|vd|xvd)", re.IGNORECASE),             # overwrite block dev
+    re.compile(r"\brm\s+-[a-zA-Z]*r[a-zA-Z]*f?\s+/(?:\*|\s|$)", re.IGNORECASE),     # rm -rf / 或 rm -rf /*
+    re.compile(r"\brm\s+[^\n]*--no-preserve-root\b", re.IGNORECASE),                # --no-preserve-root
+    re.compile(r"\bmkfs(\.\w+)?\b", re.IGNORECASE),                                 # mkfs
+    re.compile(r"\bdd\s+[^;&|]*of=/dev/", re.IGNORECASE),                           # dd of=/dev/
+    re.compile(r":\(\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:", re.IGNORECASE),         # fork bomb
+    re.compile(r"\bdrop\s+database\b", re.IGNORECASE),                              # drop database
+    re.compile(r"\b(?:shutdown|poweroff|halt)\b", re.IGNORECASE),                   # shutdown / poweroff / halt
+    re.compile(r">\s*/dev/(?:sd|nvme|hd|vd|xvd)", re.IGNORECASE),                   # overwrite block dev
+    re.compile(r"\bchmod\s+-[a-zA-Z]*R[a-zA-Z]*\s+777\s+/(?:\s|$)", re.IGNORECASE), # chmod -R 777 /
+    re.compile(r"\b(?:curl|wget)\b[^|\n]*\|\s*(?:sudo\s+)?(?:ba|z|da)?sh\b", re.IGNORECASE),  # curl|bash
 ]
 
 
@@ -58,12 +61,21 @@ class RemedyExecutor:
         _CACHED_TARGET["port"] = port or 22
 
     @classmethod
-    def get_cached_target(cls) -> Dict[str, Any]:
+    def get_cached_target(cls, include_secret: bool = False) -> Dict[str, Any]:
+        """取得目前快取連線資訊；預設遮蔽明文密碼，避免透過 HTTP API 外洩"""
         global _CACHED_TARGET
-        return dict(_CACHED_TARGET)
+        data = {
+            "host": _CACHED_TARGET.get("host"),
+            "user": _CACHED_TARGET.get("user", ""),
+            "port": _CACHED_TARGET.get("port", 22),
+            "has_password": bool(_CACHED_TARGET.get("password")),
+        }
+        if include_secret:
+            data["password"] = _CACHED_TARGET.get("password")
+        return data
 
-    def is_safe_command(self, cmd: str) -> tuple[bool, str]:
-        """安全審查：確保指令非格式化、抹盤等自殺性指令"""
+    def is_safe_command(self, cmd: str) -> Tuple[bool, str]:
+        """安全審查：確保指令非格式化、抹盤或高危管線等自殺性指令"""
         clean_cmd = cmd.strip()
         if not clean_cmd or clean_cmd.startswith("#"):
             return False, "註解或空指令，無需執行"
@@ -90,9 +102,10 @@ class RemedyExecutor:
             }
 
         # 決定目標主機
+        default_user = os.environ.get("SYSSCOPE_SSH_USER", "root")
         target_host = host or _CACHED_TARGET.get("host")
-        target_user = user or _CACHED_TARGET.get("user") or "docker"
-        target_pass = password or _CACHED_TARGET.get("password")
+        target_user = user or _CACHED_TARGET.get("user") or default_user
+        target_pass = password if password is not None else _CACHED_TARGET.get("password")
         target_port = port or _CACHED_TARGET.get("port") or 22
 
         start_t = time.perf_counter()
@@ -137,9 +150,22 @@ class RemedyExecutor:
                 "stderr": str(e),
             }
 
+    @staticmethod
+    def _prepare_sudo_command(cmd: str, password: Optional[str]) -> Tuple[str, bool]:
+        """
+        將 sudo 改寫為 sudo -S -p ''，並回傳是否需要透過 stdin 寫入密碼。
+        絕不將密碼拼進 shell 指令字串，避免單引號注入與行程表外洩。
+        """
+        if not password or not re.search(r"\bsudo\s+", cmd):
+            return cmd, False
+        if "sudo -S" in cmd:
+            return cmd, True
+        rewritten = re.sub(r"\bsudo\s+", "sudo -S -p '' ", cmd)
+        return rewritten, True
+
     def _exec_ssh(self, cmd: str, host: str, user: str, password: Optional[str],
                   port: int, timeout: int) -> Dict[str, Any]:
-        """遠端 SSH 執行指令 (支援 Sudo 自動注入)"""
+        """遠端 SSH 執行指令 (stdin 安全傳遞 sudo 密碼 + 非阻塞雙通道防死鎖)"""
         if not HAS_PARAMIKO:
             return {
                 "success": False,
@@ -164,22 +190,63 @@ class RemedyExecutor:
                 allow_agent=True
             )
 
-            # 若指令包含 sudo 且有密碼，透過 echo 管道注入 sudo 密碼
-            effective_cmd = cmd
-            if "sudo " in cmd and password:
-                # 替換為 echo password | sudo -S ...
-                # 避免破壞原先已有 sudo -S 的指令
-                if "sudo -S" not in cmd:
-                    effective_cmd = cmd.replace("sudo ", f"echo '{password}' | sudo -S ")
+            effective_cmd, need_sudo_stdin = self._prepare_sudo_command(cmd, password)
+            effective_cmd = f"DEBIAN_FRONTEND=noninteractive {effective_cmd}"
 
             stdin, stdout, stderr = client.exec_command(effective_cmd, timeout=timeout)
-            out_str = stdout.read().decode("utf-8", errors="ignore").strip()
-            err_str = stderr.read().decode("utf-8", errors="ignore").strip()
-            exit_code = stdout.channel.recv_exit_status()
+            chan = stdout.channel
 
-            # 清洗 sudo 提示殘留
+            if need_sudo_stdin and password:
+                try:
+                    # 針對可能出現多次 sudo 的管線，寫入密碼後關閉寫入端
+                    sudo_count = max(1, len(re.findall(r"\bsudo\s+-S", effective_cmd)))
+                    stdin.write((password + "\n") * sudo_count)
+                    stdin.flush()
+                    stdin.channel.shutdown_write()
+                except Exception:
+                    pass
+
+            out_chunks = []
+            err_chunks = []
+            deadline = time.monotonic() + max(1, timeout)
+            timed_out = False
+
+            while True:
+                got_data = False
+                if chan.recv_ready():
+                    out_chunks.append(chan.recv(8192))
+                    got_data = True
+                if chan.recv_stderr_ready():
+                    err_chunks.append(chan.recv_stderr(8192))
+                    got_data = True
+
+                if chan.exit_status_ready() and not chan.recv_ready() and not chan.recv_stderr_ready():
+                    break
+
+                if time.monotonic() > deadline:
+                    timed_out = True
+                    try:
+                        chan.close()
+                    except Exception:
+                        pass
+                    break
+
+                if not got_data:
+                    time.sleep(0.03)
+
+            out_str = b"".join(out_chunks).decode("utf-8", errors="ignore").strip()
+            err_str = b"".join(err_chunks).decode("utf-8", errors="ignore").strip()
             err_str = re.sub(r"\[sudo\] password for [^:]+:\s*", "", err_str).strip()
 
+            if timed_out:
+                return {
+                    "success": False,
+                    "exit_code": 124,
+                    "stdout": out_str,
+                    "stderr": (err_str + f"\nSSH 指令執行超時 ({timeout}s)").strip(),
+                }
+
+            exit_code = chan.recv_exit_status()
             return {
                 "success": exit_code == 0,
                 "exit_code": exit_code,

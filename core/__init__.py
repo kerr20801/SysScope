@@ -5,6 +5,7 @@ from core.systemd_catcher import SystemdCatcher
 from core.oom_forensic import OOMForensic
 from core.reboot_readiness import RebootReadiness
 from core.net_kernel_audit import NetKernelAudit
+from core.backdoor_hunter import BackdoorHunter
 from core.master_synthesizer import MasterSynthesizer
 
 __all__ = [
@@ -14,5 +15,6 @@ __all__ = [
     "OOMForensic",
     "RebootReadiness",
     "NetKernelAudit",
+    "BackdoorHunter",
     "MasterSynthesizer"
 ]

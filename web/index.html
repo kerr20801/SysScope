@@ -116,7 +116,7 @@ tr:hover{background:rgba(255,255,255,0.02)}
     </div>
   </div>
   <div class="header-right">
-    <div class="pill">聯合打造：<strong>Kerr & Google Gemini</strong></div>
+    <div class="pill">聯合打造：<strong>SysScope Team</strong></div>
     <div class="pill">核心理念：<strong>人機協同 · 深維透視</strong></div>
     <div class="pill" id="sysHostBadge">主機：<strong>載入中...</strong></div>
   </div>
@@ -131,6 +131,7 @@ tr:hover{background:rgba(255,255,255,0.02)}
   <button class="tab-btn" id="tabBtnOOM" onclick="switchTab('oom')">🔪 OOM 殺人案發現場 (OOM Forensic)</button>
   <button class="tab-btn" id="tabBtnReboot" onclick="switchTab('reboot')">💣 重開機安全驗收 (Reboot Readiness)</button>
   <button class="tab-btn" id="tabBtnCve" onclick="switchTab('cve')">🛡️ CVE 比對 (CVE Audit)</button>
+  <button class="tab-btn" id="tabBtnBackdoor" onclick="switchTab('backdoor')">🔎 後門與植入物獵捕 (Backdoor Hunter)</button>
 </div>
 
 <main class="main">
@@ -173,7 +174,7 @@ tr:hover{background:rgba(255,255,255,0.02)}
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center;">
-        <input type="text" id="sshHost" class="sinput" placeholder="主機 IP (例: 192.168.1.100)" style="width:170px;" value="">
+        <input type="text" id="sshHost" class="sinput" placeholder="主機 IP (例: 192.0.2.100)" style="width:170px;" value="">
         <input type="text" id="sshUser" class="sinput" placeholder="SSH 帳號 (例: root)" style="width:130px;" value="">
         <input type="password" id="sshPass" class="sinput" placeholder="密碼 / sudo 密碼" style="width:150px;" value="">
         <input type="number" id="sshPort" class="sinput" placeholder="Port" style="width:65px;" value="22">
@@ -223,7 +224,7 @@ Killed process 18291 (mysqld) anon-rss:382910kB
 
 === [5] REBOOT ===
 UUID=a1b2c3d4-0001 / ext4 defaults 0 1
-192.168.1.100:/shared/nfs /mnt/nfs nfs defaults 0 0
+192.0.2.100:/shared/nfs /mnt/nfs nfs defaults 0 0
 
 === [6] NETWORK ===
 Netid State  Recv-Q Send-Q Local Address:Port Peer Address:Port Process
@@ -450,7 +451,7 @@ Swap:          2047        2047           0"></textarea>
 # /etc/fstab
 UUID=a1b2c3d4-0001 / ext4 errors=remount-ro 0 1
 UUID=a1b2c3d4-0002 /boot ext4 defaults 0 2
-192.168.1.100:/shared/nfs /mnt/nfs nfs defaults 0 0
+192.0.2.100:/shared/nfs /mnt/nfs nfs defaults 0 0
 /dev/sdb1 /data ext4 defaults 0 2"></textarea>
       <div class="btn-row">
         <button class="btn btn-primary" onclick="analyzeReboot()">⚡ 重開機安全性 100 分驗收</button>
@@ -489,6 +490,42 @@ UUID=a1b2c3d4-0002 /boot ext4 defaults 0 2
     <div id="cveResults" style="display:none;"></div>
   </div>
 
+  <!-- ==================== TAB 7: 後門與植入物獵捕 (新手白話友善版) ==================== -->
+  <div id="viewBackdoor" style="display:none;">
+    <div class="card" style="border-left:4px solid #f43f5e;background:#0d1525;padding:16px 20px;">
+      <div style="font-size:13px;color:#cbd5e1;line-height:1.7;">
+        <strong style="color:#fb7185;font-size:15px;">🔎 懷疑 Linux 主機被埋後門或中木馬？不熟 Linux 也能一鍵快篩！</strong><br>
+        自動檢查駭客最常動手腳的 <strong>7 大藏匿點</strong>：
+        ① 幽靈 Root 帳號（UID=0）與異常免密 sudo　
+        ② SSH 金鑰偷塞強制指令　
+        ③ 排程 / 開機腳本自動下載執行　
+        ④ <code>/etc/ld.so.preload</code> 隱藏劫持　
+        ⑤ 挖礦木馬 / 反彈 Shell / 刪檔常駐行程　
+        ⑥ 異常外連埠與高危 SUID 提權　
+        ⑦ <code>/tmp</code> 隱藏執行檔與 Webshell。<br>
+        👉 <strong>步驟 1</strong>：點擊下方按鈕複製「純唯讀採集指令」（不會修改主機任何檔案），貼到 Linux 終端機執行。<br>
+        👉 <strong>步驟 2</strong>：把終端機輸出貼到下方框內，按「開始獵捕分析」，系統會用<strong>白話告訴你正常應該長怎樣、該怎麼安全確認</strong>！
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+          <button class="btn btn-sm btn-primary" onclick="copyBackdoorCollector()">📋 複製一鍵安全採集指令（純唯讀）</button>
+          <button class="btn btn-sm btn-secondary" onclick="loadBackdoorSample()">🧪 載入後門模擬範例（先看效果）</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <div><h2>🕵️ 貼上 Linux 採集結果（或直接貼 ps / crontab / ss / passwd 片段）</h2></div>
+      </div>
+      <textarea id="backdoorInput" spellcheck="false" style="min-height:180px;" placeholder="貼上「一鍵安全採集指令」的完整輸出，或是任何你想檢查的 crontab / ps aux / ss -tunap / /etc/passwd / authorized_keys 片段……"></textarea>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="analyzeBackdoor()">🔎 開始後門與植入物獵捕</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('backdoorInput').value='';document.getElementById('backdoorResults').style.display='none';">🗑️ 清空</button>
+      </div>
+    </div>
+
+    <div id="backdoorResults" style="display:none;"></div>
+  </div>
+
 </main>
 
 <script>
@@ -503,7 +540,8 @@ function switchTab(tab) {
     'systemd':  { btn: 'tabBtnSystemd',  view: 'viewSystemd' },
     'oom':      { btn: 'tabBtnOOM',      view: 'viewOOM' },
     'reboot':   { btn: 'tabBtnReboot',   view: 'viewReboot' },
-    'cve':      { btn: 'tabBtnCve',      view: 'viewCve' }
+    'cve':      { btn: 'tabBtnCve',      view: 'viewCve' },
+    'backdoor': { btn: 'tabBtnBackdoor', view: 'viewBackdoor' }
   };
   Object.keys(tabMap).forEach(t => {
     const item = tabMap[t];
@@ -1745,6 +1783,140 @@ async function resetToLocal() {
   } catch(e) {
     showToast('切換本機模式失敗');
   }
+}
+
+// ----------------------------------------------------------------------------
+// 後門與植入物獵捕 (Backdoor Hunter - 新手白話友善版)
+// ----------------------------------------------------------------------------
+async function copyBackdoorCollector() {
+  try {
+    const res = await fetch('/api/backdoor/collector');
+    const data = await res.json();
+    copySnippet(data.command);
+    showToast('已複製「純唯讀後門安全採集指令」，請貼到 Linux 終端機執行！');
+  } catch (e) {
+    showToast('取得後門採集指令失敗: ' + e.message);
+  }
+}
+
+async function loadBackdoorSample() {
+  try {
+    const res = await fetch('/api/sample?type=backdoor');
+    const data = await res.json();
+    document.getElementById('backdoorInput').value = data.content || '';
+    showToast('已載入模擬入侵後門範例，正在自動獵捕分析...');
+    await analyzeBackdoor();
+  } catch (e) {
+    showToast('載入範例失敗: ' + e.message);
+  }
+}
+
+async function analyzeBackdoor() {
+  const text = document.getElementById('backdoorInput').value.trim();
+  if (!text) {
+    showToast('請先貼上 Linux 採集結果，或按「載入後門模擬範例」');
+    return;
+  }
+  try {
+    const res = await fetch('/api/diagnose/backdoor', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    const data = await res.json();
+    if (data.success === false) {
+      showToast(data.error || '分析失敗');
+      return;
+    }
+    renderBackdoorResults(data);
+  } catch (e) {
+    showToast('後門獵捕請求異常: ' + e.message);
+  }
+}
+
+function renderBackdoorResults(data) {
+  const box = document.getElementById('backdoorResults');
+  const v = data.verdict || {};
+  const findings = data.findings || [];
+  const checklist = data.beginner_checklist || [];
+
+  const sevStyle = {
+    CRITICAL: { bg: '#450a0a', border: '#ef4444', badge: 'badge-crit', label: '🔴 重大風險 (CRITICAL)' },
+    HIGH:     { bg: '#431407', border: '#f97316', badge: 'badge-warn', label: '🟠 高風險 (HIGH)' },
+    MEDIUM:   { bg: '#422006', border: '#eab308', badge: 'badge-warn', label: '🟡 建議盤點 (MEDIUM)' },
+    INFO:     { bg: '#0f172a', border: '#64748b', badge: 'badge-ok',   label: 'ℹ️ 提示' }
+  };
+
+  const scoreColor = data.security_score >= 85 ? '#10b981' : (data.security_score >= 60 ? '#f59e0b' : '#ef4444');
+
+  const checklistHtml = checklist.length ? `
+    <div class="card" style="border-left:4px solid #38bdf8;background:#0d1525;">
+      <div class="card-hdr"><h2>🧭 新手下一步怎麼做？（先查再動，不要慌）</h2></div>
+      <ol style="padding-left:20px;color:#e2e8f0;font-size:13.5px;line-height:1.75;">
+        ${checklist.map(step => `<li style="margin-bottom:4px;">${escapeHtml(step)}</li>`).join('')}
+      </ol>
+    </div>` : '';
+
+  const findingsHtml = findings.length === 0
+    ? `<div class="card" style="border-left:4px solid #10b981;background:#052e16;color:#bbf7d0;font-size:14px;">
+         ✅ 在這份檢體中沒有發現常見的幽靈帳號、排程後門、LD_PRELOAD 劫持、挖礦木馬或反彈 Shell。
+       </div>`
+    : findings.map((f, idx) => {
+        const st = sevStyle[f.severity] || sevStyle.INFO;
+        const safeCmdAttr = escapeHtml(f.safe_verify_cmd || '');
+        return `
+          <div class="card" style="border-left:5px solid ${st.border};background:#0f172a;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+              <div>
+                <span class="badge ${st.badge}" style="margin-right:8px;">${st.label}</span>
+                <span class="badge" style="background:#1e293b;color:#38bdf8;border:1px solid #334155;">${escapeHtml(f.category)}</span>
+              </div>
+              <span style="color:#64748b;font-size:12px;">#${idx + 1}</span>
+            </div>
+            <h3 style="color:#f8fafc;font-size:15.5px;margin:0 0 10px 0;">${escapeHtml(f.title)}</h3>
+            <div style="background:#1e293b;padding:10px 14px;border-radius:8px;margin-bottom:8px;font-size:13.5px;line-height:1.65;color:#e2e8f0;">
+              <div><strong style="color:#fbbf24;">💡 白話解釋：</strong>${escapeHtml(f.plain_explain)}</div>
+              <div style="margin-top:6px;color:#94a3b8;"><strong style="color:#34d399;">📏 正常機器應該長怎樣：</strong>${escapeHtml(f.normal_baseline)}</div>
+            </div>
+            <div style="margin-bottom:8px;">
+              <div style="font-size:12px;color:#94a3b8;margin-bottom:4px;">📌 抓到的原始證據：</div>
+              <pre style="margin:0;padding:8px 12px;background:#020617;border:1px solid #334155;border-radius:6px;color:#fda4af;font-size:12.5px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;">${escapeHtml(f.evidence)}</pre>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr;gap:8px;">
+              <div style="background:#082f49;border:1px solid #0369a1;padding:10px 12px;border-radius:8px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px;">
+                  <strong style="color:#7dd3fc;font-size:12.5px;">🔍 先查再動（安全唯讀確認指令，不會改動系統）：</strong>
+                  <button class="btn btn-sm btn-secondary" data-cmd="${safeCmdAttr}" onclick="copySnippet(this.dataset.cmd)">📋 複製指令</button>
+                </div>
+                <code style="color:#e0f2fe;font-size:12.5px;word-break:break-all;">${safeCmdAttr}</code>
+              </div>
+              <div style="background:#1e1b4b;border:1px solid #4338ca;padding:10px 12px;border-radius:8px;font-size:13px;color:#e0e7ff;">
+                <strong style="color:#a5b4fc;">🛠️ 處置建議：</strong>${escapeHtml(f.remedy_advice)}
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+
+  box.innerHTML = `
+    <div class="card" style="border:2px solid ${v.color || '#64748b'};background:#0b1220;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;">
+        <div style="flex:1;min-width:260px;">
+          <div style="font-size:13px;font-weight:800;color:${v.color || '#94a3b8'};margin-bottom:4px;">${escapeHtml(v.badge || '')}</div>
+          <h2 style="margin:0 0 6px 0;color:#f8fafc;font-size:18px;">${escapeHtml(v.title || '')}</h2>
+          <p style="margin:0;color:#cbd5e1;font-size:13.5px;line-height:1.6;">${escapeHtml(v.summary || '')}</p>
+        </div>
+        <div style="text-align:center;min-width:120px;padding:10px 16px;background:#0f172a;border-radius:12px;border:1px solid #334155;">
+          <div style="font-size:11.5px;color:#94a3b8;">安全健康評分</div>
+          <div style="font-size:30px;font-weight:900;color:${scoreColor};line-height:1.2;">${data.security_score}</div>
+          <div style="font-size:11px;color:#64748b;">紅 ${data.critical_count || 0} / 橘 ${data.high_count || 0} / 黃 ${data.medium_count || 0}</div>
+        </div>
+      </div>
+    </div>
+    ${checklistHtml}
+    ${findingsHtml}
+  `;
+  box.style.display = 'block';
+  box.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 </script>
